@@ -1,0 +1,1380 @@
+import mongoose from 'mongoose';
+import moment from 'moment';
+import FeeDemand from '../models/feeDemand.js';
+import Student from '../models/student.model.js';
+import Month from '../models/month.model.js';
+import Session from '../models/session.model.js';
+import FeeType from '../models/feeType.model.js';
+import Discount from '../models/discount.model.js';
+import Transaction from '../models/transaction.model.js';
+import { uploadFile } from '../middleware/_multer.js';
+
+// create fee demand get all student class id and create all student fee demand
+export const CreateFeeDemandAllStudent = async (req, res) => {
+  const { feeTypeId, discountId, classId, sessionId } = req.body;
+  try {
+    // const students = await Student.find({ classId });
+    // const month = await Month.find();
+    // const feeType = await FeeType.findOne({ _id: feeTypeId });
+    // const discount = await Discount.findOne({ _id: discountId });
+    // if (!students) {
+    //   return res.status(200).json({
+    //     success: false,
+    //     message: 'Student not found'
+    //   });
+    // }
+
+    // promise all
+    const [students, month, feeType, discount] = await Promise.all([
+      Student.find({ classId }),
+      Month.find(),
+      FeeType.findOne({ _id: feeTypeId }),
+      Discount.findOne({ _id: discountId })
+    ]);
+
+    // getSession for student
+    const session = await Session.findOne({
+      _id: sessionId ?? students[0].sessionId
+    });
+
+    const feeDemand = students.map((student) => {
+      const monthData = month.map((data) => {
+        return {
+          studentId: student._id,
+          classId: student.classId,
+          sessionId: session._id,
+          monthId: data._id,
+          feeTypeId,
+          discountId,
+          monthName: data.month,
+          feeDate: moment(data?.month, 'MMMM').toDate(),
+          feeNo: data.sNo,
+          sessionName: session.session,
+          feeTypeName: feeType.feeName,
+          beforeFeeDiscountAmount: feeType.feeAmount,
+          feeDiscountAmount: discount?.discount ?? 0,
+          feeAmount: feeType.feeAmount - (discount?.discount ?? 0)
+        };
+      });
+      return monthData;
+    });
+
+    // check if already exist or not
+    const checkFeeDemand = await FeeDemand.find({
+      studentId: { $in: students.map((data) => data._id) },
+      feeTypeId,
+      discountId
+    });
+
+    if (checkFeeDemand.length > 0) {
+      return res.status(200).json({
+        success: false,
+        message: 'Fee demand already exists.'
+      });
+    }
+
+    const flatFeeDemand = feeDemand.flat();
+
+    const saveFeeDemand = await FeeDemand.insertMany(flatFeeDemand);
+    if (!saveFeeDemand) {
+      return res.status(200).json({
+        success: false,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(201).json({
+      success: true,
+      message: 'Fee demand created successfully.',
+      data: saveFeeDemand
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// create fee demand
+export const CreateFeeDemandAllStudentSpecificMonth = async (req, res) => {
+  const { feeTypeId, discountId, classId, monthId, sessionId } = req.body;
+  try {
+    const [students, month, feeType, discount] = await Promise.all([
+      Student.find({ classId }),
+      Month.findOne({ _id: monthId }),
+      FeeType.findOne({ _id: feeTypeId }),
+      Discount.findOne({ _id: discountId })
+    ]);
+
+    // getSession for student
+    const session = await Session.findOne({
+      _id: sessionId ?? students[0].sessionId
+    });
+
+    const feeDemand = students.map((student) => {
+      return {
+        studentId: student._id,
+        classId: student.classId,
+        sessionId: session._id,
+        monthId: month._id,
+        feeTypeId,
+        discountId,
+        monthName: month.month,
+        feeDate: moment(month?.month, 'MMMM').toDate(),
+        feeNo: month.sNo,
+        sessionName: session.session,
+        feeTypeName: feeType.feeName,
+        beforeFeeDiscountAmount: feeType.feeAmount,
+        feeDiscountAmount: discount?.discount ?? 0,
+        feeAmount: feeType.feeAmount - (discount?.discount ?? 0)
+      };
+    });
+
+    // check if already exist or not
+    const checkFeeDemand = await FeeDemand.find({
+      studentId: { $in: students.map((data) => data._id) },
+      feeTypeId,
+      discountId
+    });
+
+    if (checkFeeDemand.length > 0) {
+      return res.status(200).json({
+        success: false,
+        message: 'Fee demand already exists.'
+      });
+    }
+
+    const saveFeeDemand = await FeeDemand.insertMany(feeDemand);
+    if (!saveFeeDemand) {
+      return res.status(200).json({
+        success: false,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(201).json({
+      success: true,
+      message: 'Fee demand created successfully.',
+      data: saveFeeDemand
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// create fee demand with student id and fee mapping id and month id and session id and fee type amount and is advance and is one time and status
+export const CreateFeeDemand = async (req, res) => {
+  const { studentId, monthId, feeTypeId, discountId, sessionId } = req.body;
+  try {
+    // already exist or not
+    const checkFeeDemand = await FeeDemand.findOne({
+      studentId,
+      monthId,
+      feeTypeId,
+      discountId,
+      sessionId
+    });
+
+    const student = await Student.findOne({ _id: studentId });
+    if (!student) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    const month = await Month.findOne({ _id: monthId });
+    if (!month) {
+      return res.status(400).json({
+        success: false,
+        message: 'Month not found'
+      });
+    }
+
+    const session = await Session.findOne({ _id: sessionId });
+    if (!session) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    const feeType = await FeeType.findOne({ _id: feeTypeId });
+    if (!feeType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fee type not found'
+      });
+    }
+
+    const discount = await Discount.findOne({ _id: discountId });
+
+    if (checkFeeDemand) {
+      return res.status(200).json({
+        success: false,
+        message: 'Fee demand already exists.'
+      });
+    }
+    const newFeeDemand = new FeeDemand({
+      studentId,
+      classId: student.classId,
+      sessionId: session._id,
+      monthId,
+      feeTypeId,
+      discountId,
+      monthName: month.month,
+      feeDate: moment(month?.month, 'MMMM').toDate(),
+      feeNo: month.sNo,
+      sessionName: session.session,
+      feeTypeName: feeType.feeName,
+      beforeFeeDiscountAmount: feeType.feeAmount,
+      feeDiscountAmount: discount?.discount ?? 0,
+      feeAmount: feeType.feeAmount - (discount?.discount ?? 0)
+    });
+    const saveFeeDemand = await newFeeDemand.save();
+    return res.status(201).json({
+      success: true,
+      message: 'Fee demand created successfully.',
+      data: saveFeeDemand
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// get all fee demands with pagination with page and limit and search query and sort by createdAt in descending order and project __v to 0 and populate student id and fee mapping id and session id and month id
+export const GetAllFeeDemands = async (req, res) => {
+  const { page = 1, limit = 10, q } = req.query;
+  const options = { page, limit };
+  try {
+    let query = [
+      {
+        $sort: {
+          createdAt: -1
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_students',
+          localField: 'studentId',
+          foreignField: '_id',
+          as: 'student'
+        }
+      },
+      {
+        $unwind: {
+          path: '$student',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_class_feeType_mapping',
+          localField: 'feeMapingId',
+          foreignField: '_id',
+          as: 'feeMapping'
+        }
+      },
+      {
+        $unwind: {
+          path: '$feeMapping',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_sessions_mstrs',
+          localField: 'sessionId',
+          foreignField: '_id',
+          as: 'session'
+        }
+      },
+      {
+        $unwind: {
+          path: '$session',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_month_mstrs',
+          localField: 'monthId',
+          foreignField: '_id',
+          as: 'month'
+        }
+      },
+      {
+        $unwind: {
+          path: '$month',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          'student.__v': 0,
+          'feeMapping.__v': 0,
+          'session.__v': 0,
+          'month.__v': 0,
+          'student._id': 0,
+          'feeMapping._id': 0,
+          'session._id': 0,
+          'month._id': 0,
+          'student.createdAt': 0,
+          'student.updatedAt': 0,
+          'feeMapping.createdAt': 0,
+          'feeMapping.updatedAt': 0,
+          'session.createdAt': 0,
+          'session.updatedAt': 0,
+          'month.createdAt': 0,
+          'month.updatedAt': 0,
+          'student.status': 0,
+          'feeMapping.status': 0,
+          'session.status': 0,
+          'month.status': 0,
+          'student.password': 0
+        }
+      }
+    ];
+    if (q) {
+      query.push({
+        $match: {
+          $or: [{ 'student.fullName': { $regex: new RegExp(q, 'i') } }]
+        }
+      });
+    }
+    const aggregate = FeeDemand.aggregate(query);
+    const feeDemands = await FeeDemand.aggregatePaginate(aggregate, options);
+    if (!feeDemands) {
+      return res.status(400).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: feeDemands
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const GetFeeDemandWithStudentId = async (req, res) => {
+  // const { month, studentId, sessionId } = req.query;
+
+  // try {
+  //   const monthDate = await Month.findOne({ month: month });
+  //   // const student = await Student.findOne({ userId: req.user?._id });
+  //   // if student not found then get student by studentId
+  //   const student = await Student.findOne({
+  //     _id: studentId ?? (await Student.findOne({ userId: req.user?._id }))._id
+  //   });
+
+  //   const totalAmount = await FeeDemand.aggregate([
+  //     {
+  //       $match: {
+  //         studentId: new mongoose.Types.ObjectId(studentId ?? student._id),
+  //         sessionId: new mongoose.Types.ObjectId(
+  //           sessionId ?? student.sessionId
+  //         ),
+  //         ...(month && {
+  //           feeNo: {
+  //             $lte: parseInt(monthDate.sNo)
+  //           }
+  //         })
+  //       }
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: '$feeAmount' }
+  //       }
+  //     }
+  //   ]);
+
+  //   if (!studentId && !student) {
+  //     return res.status(200).json({
+  //       success: false,
+  //       message: 'Student not found'
+  //     });
+  //   }
+
+  //   const query = [
+  //     {
+  //       $match: {
+  //         studentId: new mongoose.Types.ObjectId(studentId ?? student._id),
+  //         sessionId: new mongoose.Types.ObjectId(
+  //           sessionId ?? student.sessionId
+  //         ),
+  //         isPaid: false,
+  //         ...(month && {
+  //           feeNo: {
+  //             $lte: parseInt(monthDate.sNo)
+  //           }
+  //         })
+  //       }
+  //     },
+  //     {
+  //       $lookup: {
+  //         from: 'tbl_students',
+  //         localField: 'studentId',
+  //         foreignField: '_id',
+  //         as: 'student'
+  //       }
+  //     },
+  //     {
+  //       $unwind: {
+  //         path: '$student',
+  //         preserveNullAndEmptyArrays: true
+  //       }
+  //     },
+  //     {
+  //       $project: {
+  //         'student.__v': 0,
+  //         'student.createdAt': 0,
+  //         'student.updatedAt': 0,
+  //         'student.status': 0,
+  //         'student.password': 0,
+  //         'student._id': 0
+  //       }
+  //     },
+  //     {
+  //       $group: {
+  //         _id: '$monthName',
+  //         feeDetails: { $push: '$$ROOT' }
+  //       }
+  //     },
+  //     {
+  //       $project: {
+  //         _id: 0,
+  //         monthName: '$_id',
+  //         feeDetails: 1
+  //       }
+  //     },
+  //     {
+  //       $sort: {
+  //         'feeDetails.feeNo': 1
+  //       }
+  //     }
+  //   ];
+  //   const feeDemand = await FeeDemand.aggregate(query);
+  //   if (!feeDemand) {
+  //     return res.status(400).json({
+  //       success: true,
+  //       message: 'Fee demand not found'
+  //     });
+  //   }
+
+  //   const feeDemandData = feeDemand.map((data) => {
+  //     const feeAmount = data.feeDetails.reduce((acc, curr) => {
+  //       return acc + curr.feeAmount;
+  //     }, 0);
+  //     const feeDiscountAmount = data.feeDetails.reduce((acc, curr) => {
+  //       return acc + curr.feeDiscountAmount;
+  //     }, 0);
+  //     const beforeFeeDiscountAmount = data.feeDetails.reduce((acc, curr) => {
+  //       return acc + curr.beforeFeeDiscountAmount;
+  //     }, 0);
+  //     return {
+  //       monthName: data.monthName,
+  //       feeAmount,
+  //       feeDiscountAmount,
+  //       beforeFeeDiscountAmount,
+  //       feeDetails: data.feeDetails
+  //     };
+  //   });
+
+  //   const getPaidAmount = feeDemandData.reduce((acc, curr) => {
+  //     return acc + curr.feeAmount;
+  //   }, 0);
+
+  //   const getDiscountAmount = feeDemandData.reduce((acc, curr) => {
+  //     return acc + curr.feeDiscountAmount;
+  //   }, 0);
+
+  //   const getBeforeDiscountAmount = feeDemandData.reduce((acc, curr) => {
+  //     return acc + curr.beforeFeeDiscountAmount;
+  //   }, 0);
+
+  //   // get start month and end month?
+  //   const fromMonth = feeDemandData[0]?.monthName;
+  //   const uptoMonth = feeDemandData[feeDemandData.length - 1]?.monthName;
+
+  //   return res.status(200).json({
+  //     success: true,
+  //     data: feeDemandData,
+  //     pendingAmount: getPaidAmount,
+  //     totalAmount: totalAmount[0]?.total ?? 0,
+  //     discountAmount: getDiscountAmount,
+  //     beforeDiscountAmount: getBeforeDiscountAmount,
+  //     fromMonth,
+  //     uptoMonth
+  //   });
+  // } catch (error) {
+  //   return res.status(500).json({
+  //     success: false,
+  //     message: error.message
+  //   });
+  // }
+  // refactor code
+
+  const { month, studentId, sessionId } = req.query;
+
+  try {
+    const monthDate = month ? await Month.findOne({ month }) : null;
+    if (month && !monthDate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Month not found'
+      });
+    }
+
+    const student = studentId
+      ? await Student.findById(studentId)
+      : await Student.findOne({ userId: req.user?._id });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    const studentObjectId = new mongoose.Types.ObjectId(student._id);
+    const sessionObjectId = new mongoose.Types.ObjectId(
+      sessionId || student.sessionId
+    );
+
+    const matchConditions = {
+      studentId: studentObjectId,
+      sessionId: sessionObjectId,
+      ...(month && { feeNo: { $lte: parseInt(monthDate.sNo) } })
+    };
+
+    const totalAmountResult = await FeeDemand.aggregate([
+      { $match: matchConditions },
+      { $group: { _id: null, total: { $sum: '$feeAmount' } } }
+    ]);
+    const totalAmount = totalAmountResult.length
+      ? totalAmountResult[0].total
+      : 0;
+
+    const feeDemand = await FeeDemand.aggregate([
+      { $match: { ...matchConditions, isPaid: false } },
+      {
+        $lookup: {
+          from: 'tbl_students',
+          localField: 'studentId',
+          foreignField: '_id',
+          as: 'student'
+        }
+      },
+      { $unwind: { path: '$student', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          'student.__v': 0,
+          'student.createdAt': 0,
+          'student.updatedAt': 0,
+          'student.status': 0,
+          'student.password': 0,
+          'student._id': 0
+        }
+      },
+      {
+        $group: {
+          _id: '$monthName',
+          feeDetails: { $push: '$$ROOT' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          monthName: '$_id',
+          feeDetails: 1
+        }
+      },
+      { $sort: { 'feeDetails.feeNo': 1 } }
+    ]);
+
+    if (!feeDemand.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Fee demand not found'
+      });
+    }
+
+    const feeDemandData = feeDemand.map((data) => {
+      const feeAmount = data.feeDetails.reduce(
+        (acc, curr) => acc + curr.feeAmount,
+        0
+      );
+      const feeDiscountAmount = data.feeDetails.reduce(
+        (acc, curr) => acc + curr.feeDiscountAmount,
+        0
+      );
+      const beforeFeeDiscountAmount = data.feeDetails.reduce(
+        (acc, curr) => acc + curr.beforeFeeDiscountAmount,
+        0
+      );
+      return {
+        monthName: data.monthName,
+        feeAmount,
+        feeDiscountAmount,
+        beforeFeeDiscountAmount,
+        feeDetails: data.feeDetails
+      };
+    });
+
+    const pendingAmount = feeDemandData.reduce(
+      (acc, curr) => acc + curr.feeAmount,
+      0
+    );
+    const discountAmount = feeDemandData.reduce(
+      (acc, curr) => acc + curr.feeDiscountAmount,
+      0
+    );
+    const beforeDiscountAmount = feeDemandData.reduce(
+      (acc, curr) => acc + curr.beforeFeeDiscountAmount,
+      0
+    );
+
+    const fromMonth = feeDemandData[0]?.monthName;
+    const uptoMonth = feeDemandData[feeDemandData.length - 1]?.monthName;
+
+    return res.status(200).json({
+      success: true,
+      data: feeDemandData,
+      pendingAmount,
+      totalAmount,
+      discountAmount,
+      beforeDiscountAmount,
+      fromMonth,
+      uptoMonth
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const GetFeeDemandWithStudentIdByMonth = async (req, res) => {
+  const { studentId, sessionId } = req.body;
+  const student = await Student.findOne({
+    _id: studentId ?? (await Student.findOne({ userId: req.user?._id }))._id
+  });
+  try {
+    // get filterData from fee demand collection with student id and feeType and month from Month collection
+    const filterData = await FeeDemand.aggregate([
+      {
+        $match: {
+          studentId: new mongoose.Types.ObjectId(studentId ?? student._id),
+          sessionId: new mongoose.Types.ObjectId(
+            sessionId ?? student.sessionId
+          ),
+          isPaid: false
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_month_mstrs',
+          localField: 'monthId',
+          foreignField: '_id',
+          as: 'month'
+        }
+      },
+      {
+        $unwind: {
+          path: '$month',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      {
+        $project: {
+          monthName: '$month.month',
+          monthId: '$month._id'
+        }
+      },
+
+      {
+        $group: {
+          _id: '$monthName',
+          monthId: { $first: '$monthId' }
+        }
+      },
+
+      {
+        $project: {
+          _id: 0,
+          monthName: '$_id',
+          monthId: 1
+        }
+      },
+      {
+        $sort: {
+          monthId: 1
+        }
+      }
+    ]);
+    if (!filterData) {
+      return res.status(400).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: filterData
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const GetMonthList = async (req, res) => {
+  const { studentId, feeTypeId, sessionId } = req.body;
+  try {
+    // get filterData from fee demand collection with student id and feeType and month from Month collection
+    const student = await Student.findOne({ _id: studentId });
+    const getMont = await Month.find();
+    const feeDemand = await FeeDemand.find({
+      studentId,
+      feeTypeId,
+      sessionId: sessionId ?? student.sessionId
+    });
+    const month = getMont.filter((data) => {
+      const checkMonth = feeDemand.find((demand) => {
+        return demand.monthId.toString() === data._id.toString();
+      });
+      if (!checkMonth) {
+        return data;
+      }
+    });
+    if (!month) {
+      return res.status(400).json({
+        success: true,
+        message: 'Month not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: month
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// get fee demand by ststudetid
+export const GetFeeDemandByStudentId = async (req, res) => {
+  const { studentId } = req.body;
+  try {
+    const feeDemand = await FeeDemand.find({ studentId, isPaid: false }).sort({
+      feeNo: 1
+    });
+    if (!feeDemand) {
+      return res.status(400).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: feeDemand
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// update demand collection by studentId and (monthId in array), isPaid=true auto generate transaction no
+export const UpdateFeeDemand = async (req, res) => {
+  const {
+    monthId,
+    orderId,
+    paidFrom,
+    paidUpto,
+    paymentMode,
+    studentId,
+    sessionId,
+    classId
+  } = req.body;
+  try {
+    const student = await Student.findOne({
+      _id: studentId ?? (await Student.findOne({ userId: req.user?._id }))._id
+    });
+
+    const getPaidAmount = await FeeDemand.find({
+      studentId: studentId ?? student?._id,
+      sessionId: sessionId ?? student.sessionId,
+      monthName: { $in: monthId }
+    });
+
+    const calculateFeeAmount = getPaidAmount.reduce((acc, curr) => {
+      return acc + curr.feeAmount;
+    }, 0);
+
+    // ============================ 1. Check if student exists ============================
+    const tranNo = 'TRN' + Math.floor(100000 + Math.random() * 900000);
+    const updateDemand = await FeeDemand.updateMany(
+      {
+        studentId: studentId ?? student?._id,
+        sessionId: sessionId ?? student.sessionId,
+        monthName: { $in: monthId }
+      },
+      {
+        isPaid: true,
+        transactionNo: tranNo
+      }
+    );
+    if (!updateDemand) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    const transaction = new Transaction({
+      studentId: studentId ?? student._id,
+      sessionId: sessionId ?? student.sessionId,
+      classId: classId ?? student.classId,
+      transactionNo: tranNo,
+      orderId: orderId ?? '',
+      amount: calculateFeeAmount ?? 0,
+      paidFrom: paidFrom,
+      paidUpto: paidUpto,
+      paymentMode: paymentMode,
+      paymentByUserId: req.user?._id
+    });
+    await transaction.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Fee demand updated successfully.',
+      data: transaction
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// payment for cheque or dd or cash with if cheque or dd the upload cheque or dd image
+export async function ChequeOrDDPayment(req, res) {
+  const upload = uploadFile('./uploads/transaction');
+  try {
+    upload.single('chequeDdImg')(req, res, async (err) => {
+      if (err) {
+        res.status(400).json(err.message);
+      } else {
+        const {
+          monthId,
+          paidFrom,
+          paidUpto,
+          paymentMode,
+          chequeDdNo,
+          chequeDdDate,
+          bankName,
+          branchName,
+          studentId,
+          sessionId
+        } = req.body;
+        console.log(req.file?.filename);
+        // const student = await Student.findOne({ userId: req.user?._id });
+
+        const getPaidAmount = await FeeDemand.find({
+          studentId: studentId,
+          monthName: { $in: JSON.parse(monthId) }
+        });
+
+        const student = await Student.findOne({
+          _id:
+            studentId ?? (await Student.findOne({ userId: req.user?._id }))._id
+        });
+
+        const calculateFeeAmount = getPaidAmount.reduce((acc, curr) => {
+          return acc + curr.feeAmount;
+        }, 0);
+
+        // ============================ 1. Check if student exists ============================
+        const tranNo = 'TRN' + Math.floor(100000 + Math.random() * 900000);
+        const updateDemand = await FeeDemand.updateMany(
+          {
+            studentId: studentId,
+            sessionId: sessionId ?? student.sessionId,
+            monthName: { $in: JSON.parse(monthId) }
+          },
+          {
+            isPaid: true,
+            transactionNo: tranNo
+          }
+        );
+        if (!updateDemand) {
+          return res.status(200).json({
+            success: true,
+            message: 'Fee demand not found'
+          });
+        }
+        const transaction = new Transaction({
+          transactionNo: tranNo,
+          amount: calculateFeeAmount,
+          paidFrom,
+          paidUpto,
+          studentId: studentId,
+          sessionId: sessionId ?? student.sessionId,
+          paymentMode,
+          chequeDdNo: chequeDdNo,
+          chequeDdDate: chequeDdDate,
+          bankName,
+          branchName,
+          chequeDdImg: req.file?.filename,
+          paymentByUserId: req.user?._id
+        });
+        await transaction.save();
+
+        return res.status(200).json({
+          success: true,
+          message: 'Fee demand updated successfully.',
+          data: transaction
+        });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+// updateMany demand by transactionNo
+export const UpdateFeeDemandByTransactionNo = async (req, res) => {
+  const { transactionNo, remarks } = req.body;
+  try {
+    const updateDemand = await FeeDemand.updateMany(
+      { transactionNo },
+      {
+        isPaid: false
+      }
+    );
+
+    const transaction = await Transaction.findOne({ transactionNo });
+    if (transaction) {
+      // update transaction status by transactionNo remarks
+      await Transaction.updateOne(
+        { transactionNo },
+        {
+          status: 2,
+          remarks: remarks
+        }
+      );
+    }
+
+    if (!updateDemand) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Fee demand updated successfully.'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// get all isPaid false fee demand by student id
+export const GetFeeDemandAmountBySId = async (req, res) => {
+  const studentId = await Student.findOne({ userId: req.user?._id });
+  try {
+    const feeDemand = await FeeDemand.find({
+      studentId: studentId?._id,
+      isPaid: false
+    });
+    if (!feeDemand) {
+      return res.status(400).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    //  and total fee amount and total discount amount and total before discount amount
+    const feeAmount = feeDemand.reduce((acc, curr) => {
+      return acc + curr.feeAmount;
+    }, 0);
+    const feeDiscountAmount = feeDemand.reduce((acc, curr) => {
+      return acc + curr.feeDiscountAmount;
+    }, 0);
+    const beforeFeeDiscountAmount = feeDemand.reduce((acc, curr) => {
+      return acc + curr.beforeFeeDiscountAmount;
+    }, 0);
+    return res.status(200).json({
+      success: true,
+      feeAmount,
+      feeDiscountAmount,
+      beforeFeeDiscountAmount,
+      // and from month and upto month and by feeNo
+      fromMonth: feeDemand[0]?.monthName,
+      uptoMonth: feeDemand[feeDemand.length - 1]?.monthName,
+      sessionName: feeDemand[0]?.sessionName
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// update fee demand by _id
+export const UpdateFeeDemandById = async (req, res) => {
+  const { id, feeTypeId, discountId } = req.body;
+
+  try {
+    const feeType = await FeeType.findOne({ _id: feeTypeId });
+    if (!feeType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fee type not found'
+      });
+    }
+    const discount = await Discount.findOne({
+      _id: discountId
+    });
+
+    const updateDemand = await FeeDemand.findByIdAndUpdate(
+      { _id: id },
+      {
+        feeTypeId,
+        discountId: discountId ?? null,
+        feeTypeName: feeType.feeName,
+        beforeFeeDiscountAmount: feeType.feeAmount,
+        feeDiscountAmount: discount?.discount ?? 0,
+        feeAmount: feeType.feeAmount - (discount?.discount ?? 0)
+      }
+    );
+    if (!updateDemand) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Fee demand updated successfully.',
+      data: updateDemand
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// get demand by _id
+export const GetFeeDemandById = async (req, res) => {
+  const { id } = req.query;
+  try {
+    const feeDemand = await FeeDemand.findById({ _id: id });
+    if (!feeDemand) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: feeDemand
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// delete demand by id
+export const DeleteFeeDemand = async (req, res) => {
+  const { id } = req.body;
+  try {
+    const deleteDemand = await FeeDemand.findByIdAndDelete({
+      _id: id
+    });
+    if (!deleteDemand) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Fee demand deleted successfully.'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// get demand by classId or monthId with aggregate
+export const GetFeeDemandByClassIdOrMonthId = async (req, res) => {
+  const { classId, monthId, limit = 10, page = 1 } = req.query;
+  try {
+    // let query = [];
+    // if (classId) {
+    //   query = [
+    //     {
+    //       $match: {
+    //         classId: new mongoose.Types.ObjectId(classId)
+    //       }
+    //     }
+    //   ];
+    // }
+    // if (monthId) {
+    //   query = [
+    //     {
+    //       $match: {
+    //         monthId: new mongoose.Types.ObjectId(monthId)
+    //       }
+    //     }
+    //   ];
+    // }
+    // if (classId && monthId) {
+    //   query = [
+    //     {
+    //       $match: {
+    //         classId: new mongoose.Types.ObjectId(classId),
+    //         monthId: new mongoose.Types.ObjectId(monthId)
+    //       }
+    //     }
+    //   ];
+    // }
+    // // join
+    // query = [
+    //   ...query,
+    //   {
+    //     $lookup: {
+    //       from: 'tbl_students',
+    //       localField: 'studentId',
+    //       foreignField: '_id',
+    //       as: 'student'
+    //     }
+    //   },
+    //   {
+    //     $unwind: {
+    //       path: '$student',
+    //       preserveNullAndEmptyArrays: true
+    //     }
+    //   },
+
+    //   {
+    //     $lookup: {
+    //       from: 'tbl_sessions_mstrs',
+    //       localField: 'sessionId',
+    //       foreignField: '_id',
+    //       as: 'session'
+    //     }
+    //   },
+    //   {
+    //     $unwind: {
+    //       path: '$session',
+    //       preserveNullAndEmptyArrays: true
+    //     }
+    //   },
+    //   {
+    //     $lookup: {
+    //       from: 'tbl_month_mstrs',
+    //       localField: 'monthId',
+    //       foreignField: '_id',
+    //       as: 'month'
+    //     }
+    //   },
+    //   {
+    //     $unwind: {
+    //       path: '$month',
+    //       preserveNullAndEmptyArrays: true
+    //     }
+    //   },
+    //   {
+    //     $project: {
+    //       'student.__v': 0,
+    //       'feeMapping.__v': 0,
+    //       'session.__v': 0,
+    //       'month.__v': 0,
+    //       'student._id': 0,
+    //       'feeMapping._id': 0,
+    //       'session._id': 0,
+    //       'month._id': 0,
+    //       'student.createdAt': 0,
+    //       'student.updatedAt': 0,
+    //       'session.createdAt': 0,
+    //       'session.updatedAt': 0,
+    //       'month.createdAt': 0,
+    //       'month.updatedAt': 0,
+    //       'student.status': 0,
+    //       'feeMapping.status': 0,
+    //       'session.status': 0,
+    //       'month.status': 0,
+    //       'student.password': 0
+    //     }
+    //   }
+    // ];
+    // const aggregate = FeeDemand.aggregate(query);
+    // const feeDemand = await FeeDemand.aggregatePaginate(aggregate, {});
+    // if (!feeDemand) {
+    //   return res.status(200).json({
+    //     success: true,
+    //     message: 'Fee demand not found'
+    //   });
+    // }
+    // return res.status(200).json({
+    //   success: true,
+    //   data: feeDemand
+    // });
+    // join and pagination
+    let query = [];
+    if (classId) {
+      query = [
+        {
+          $match: {
+            classId: new mongoose.Types.ObjectId(classId)
+          }
+        }
+      ];
+    }
+    if (monthId) {
+      query = [
+        {
+          $match: {
+            monthId: new mongoose.Types.ObjectId(monthId)
+          }
+        }
+      ];
+    }
+    if (classId && monthId) {
+      query = [
+        {
+          $match: {
+            classId: new mongoose.Types.ObjectId(classId),
+            monthId: new mongoose.Types.ObjectId(monthId)
+          }
+        }
+      ];
+    }
+    // join
+    query = [
+      ...query,
+
+      {
+        $lookup: {
+          from: 'tbl_students',
+          localField: 'studentId',
+          foreignField: '_id',
+          as: 'student'
+        }
+      },
+      {
+        $unwind: {
+          path: '$student',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      {
+        $lookup: {
+          from: 'tbl_sessions_mstrs',
+          localField: 'sessionId',
+          foreignField: '_id',
+          as: 'session'
+        }
+      },
+      {
+        $unwind: {
+          path: '$session',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_month_mstrs',
+          localField: 'monthId',
+          foreignField: '_id',
+          as: 'month'
+        }
+      },
+      {
+        $unwind: {
+          path: '$month',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          'student.__v': 0,
+          'feeMapping.__v': 0,
+          'session.__v': 0,
+          'month.__v': 0,
+          'student._id': 0,
+          'feeMapping._id': 0,
+          'session._id': 0,
+          'month._id': 0,
+          'student.createdAt': 0,
+          'student.updatedAt': 0,
+          'session.createdAt': 0,
+          'session.updatedAt': 0,
+          'month.createdAt': 0,
+          'month.updatedAt': 0,
+          'student.status': 0,
+          'feeMapping.status': 0,
+          'session.status': 0,
+          'month.status': 0,
+          'student.password': 0
+        }
+      }
+    ];
+    const aggregate = FeeDemand.aggregate(query);
+    const options = { page, limit };
+    const feeDemand = await FeeDemand.aggregatePaginate(aggregate, options);
+    if (!feeDemand) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fee demand not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: feeDemand
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

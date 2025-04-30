@@ -1,0 +1,109 @@
+// const monthDate = moment(month, 'MMMM').toDate();
+
+  // try {
+  //   const feeDemand = await FeeDemand.aggregate([
+  //     {
+  //       $match: {
+  //         studentId: new mongoose.Types.ObjectId(studentId._id),
+  //         isPaid: false,
+  //         ...(month && {
+  //           feeDate: {
+  //             $lte: monthDate
+  //           }
+  //         })
+  //       }
+  //     },
+  //     {
+  //       $lookup: {
+  //         from: 'tbl_students',
+  //         localField: 'studentId',
+  //         foreignField: '_id',
+  //         as: 'student'
+  //       }
+  //     },
+  //     {
+  //       $unwind: {
+  //         path: '$student',
+  //         preserveNullAndEmptyArrays: true
+  //       }
+  //     },
+  //     {
+  //       $project: {
+  //         'student.__v': 0,
+  //         'student.createdAt': 0,
+  //         'student.updatedAt': 0,
+  //         'student.status': 0,
+  //         'student.password': 0,
+  //         'student._id': 0
+  //       }
+  //     },
+  //     {
+  //       $group: {
+  //         _id: '$monthName',
+  //         feeDetails: { $push: '$$ROOT' }
+  //       }
+  //     },
+  //     {
+  //       $project: {
+  //         _id: 0,
+  //         monthName: '$_id',
+  //         feeDetails: 1
+  //       }
+  //     },
+  //     {
+  //       $sort: {
+  //         'feeDetails.feeDate': 1
+  //       }
+  //     }
+  //   ]);
+  //   if (!feeDemand) {
+  //     return res.status(400).json({
+  //       success: true,
+  //       message: 'Fee demand not found'
+  //     });
+  //   }
+
+  //   const feeDemandData = feeDemand.map((data) => {
+  //     const feeAmount = data.feeDetails.reduce((acc, curr) => {
+  //       return acc + curr.feeAmount;
+  //     }, 0);
+  //     const feeDiscountAmount = data.feeDetails.reduce((acc, curr) => {
+  //       return acc + curr.feeDiscountAmount;
+  //     }, 0);
+  //     const beforeFeeDiscountAmount = data.feeDetails.reduce((acc, curr) => {
+  //       return acc + curr.beforeFeeDiscountAmount;
+  //     }, 0);
+  //     return {
+  //       monthName: data.monthName,
+  //       feeAmount,
+  //       feeDiscountAmount,
+  //       beforeFeeDiscountAmount,
+  //       feeDetails: data.feeDetails
+  //     };
+  //   });
+
+  //   const getPaidAmount = feeDemandData.reduce((acc, curr) => {
+  //     return acc + curr.feeAmount;
+  //   }, 0);
+
+  //   const getDiscountAmount = feeDemandData.reduce((acc, curr) => {
+  //     return acc + curr.feeDiscountAmount;
+  //   }, 0);
+
+  //   const getBeforeDiscountAmount = feeDemandData.reduce((acc, curr) => {
+  //     return acc + curr.beforeFeeDiscountAmount;
+  //   }, 0);
+
+  //   return res.status(200).json({
+  //     success: true,
+  //     data: feeDemandData,
+  //     paidAmount: getPaidAmount,
+  //     discountAmount: getDiscountAmount,
+  //     beforeDiscountAmount: getBeforeDiscountAmount
+  //   });
+  // } catch (error) {
+  //   return res.status(500).json({
+  //     success: false,
+  //     message: error.message
+  //   });
+  // }
