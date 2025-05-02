@@ -1,0 +1,254 @@
+import Submission from "../models/submission.model.js"
+import Person from "../models/person.model.js"
+import Journal from "../models/journal.model.js"
+
+/**
+ * @route   POST /api/submissions
+ * @desc    Create a new submission
+ * @body    { title, abstract, keywords, submittedBy, journalId, manuscriptFile, coverLetter }
+ * @returns Submission object
+ */
+export async function CreateSubmission(req, res) {
+  try {
+    const { title, abstract, keywords, submittedBy, journalId, manuscriptFile, coverLetter } = req.body
+
+    if (!title || !abstract || !submittedBy || !journalId || !manuscriptFile) {
+      return res.status(400).json({ success: false, message: "Missing required fields" })
+    }
+
+    // Verify person exists
+    const personExists = await Person.findById(submittedBy)
+    if (!personExists) {
+      return res.status(404).json({ success: false, message: "Person not found" })
+    }
+
+    // Verify journal exists
+    const journalExists = await Journal.findById(journalId)
+    if (!journalExists) {
+      return res.status(404).json({ success: false, message: "Journal not found" })
+    }
+
+    const submission = new Submission({
+      title,
+      abstract,
+      keywords,
+      submittedBy,
+      journalId,
+      manuscriptFile,
+      coverLetter,
+    })
+
+    await submission.save()
+    res.status(201).json({
+      success: true,
+      message: "Submission created successfully",
+      data: submission,
+    })
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message })
+  }
+}
+
+/**
+ * @route   GET /api/submissions
+ * @desc    Get all submissions with pagination and search
+ * @query   { page, limit, q, journalId, submittedBy, status }
+ * @returns Paginated submissions
+ */
+export const GetAllSubmissions = async (req, res) => {
+  const { page = 1, limit = 10, q, journalId, submittedBy, status } = req.query
+  const options = { page, limit }
+
+  try {
+    const query = [
+      { $sort: { submissionDate: -1 } },
+      {
+        $lookup: {
+          from: "people",
+          localField: "submittedBy",
+          foreignField: "_id",
+          as: "author",
+        },
+      },
+      { $unwind: "$author" },
+      {
+        $lookup: {
+          from: "journals",
+          localField: "journalId",
+          foreignField: "_id",
+          as: "journal",
+        },
+      },
+      { $unwind: "$journal" },
+      { $project: { __v: 0, "author.__v": 0, "journal.__v": 0 } },
+    ]
+
+    const matchConditions = {}
+
+    if (journalId) {
+      matchConditions.journalId = journalId
+    }
+
+    if (submittedBy) {
+      matchConditions.submittedBy = submittedBy
+    }
+
+    if (status) {
+      matchConditions.status = status
+    }
+
+    if (Object.keys(matchConditions).length > 0) {
+      query.push({ $match: matchConditions })
+    }
+
+    if (q) {
+      query.push({
+        $match: {
+          $or: [
+            { title: { $regex: new RegExp(q, "i") } },
+            { abstract: { $regex: new RegExp(q, "i") } },
+            { "author.firstName": { $regex: new RegExp(q, "i") } },
+            { "author.lastName": { $regex: new RegExp(q, "i") } },
+            { "journal.title": { $regex: new RegExp(q, "i") } },
+          ],
+        },
+      })
+    }
+
+    const aggregate = Submission.aggregate(query)
+    const submissions = await Submission.aggregatePaginate(aggregate, options)
+
+    if (!submissions.totalDocs) {
+      return res.status(404).json({ success: false, message: "No records found!" })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Submissions fetched successfully.",
+      data: submissions,
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+/**
+ * @route   GET /api/submissions/:id
+ * @desc    Get submission by ID
+ * @params  { id }
+ * @returns Submission object
+ */
+export const GetSubmissionById = async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const submission = await Submission.findById(id).populate("submittedBy").populate("journalId")
+
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission not found." })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Submission fetched successfully.",
+      data: submission,
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+/**
+ * @route   PUT /api/submissions/:id
+ * @desc    Update submission by ID
+ * @params  { id }
+ * @body    { title, abstract, keywords, status, manuscriptFile, coverLetter }
+ * @returns Success message
+ */
+export const UpdateSubmission = async (req, res) => {
+  const { id } = req.params
+  const updateFields = req.body
+
+  try {
+    const submission = await Submission.findById(id)
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission not found." })
+    }
+
+    // Don't allow changing submittedBy or journalId after creation
+    if (updateFields.submittedBy || updateFields.journalId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot change submitter or journal after submission is created",
+      })
+    }
+
+    await Submission.findByIdAndUpdate(id, updateFields, { new: true })
+
+    return res.status(200).json({
+      success: true,
+      message: "Submission updated successfully.",
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+/**
+ * @route   PATCH /api/submissions/:id/status
+ * @desc    Update submission status
+ * @params  { id }
+ * @body    { status }
+ * @returns Updated submission
+ */
+export const UpdateSubmissionStatus = async (req, res) => {
+  const { id } = req.params
+  const { status } = req.body
+
+  try {
+    const submission = await Submission.findById(id)
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission not found." })
+    }
+
+    if (!["submitted", "under_review", "accepted", "rejected", "revisions_requested"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status value" })
+    }
+
+    const updatedSubmission = await Submission.findByIdAndUpdate(id, { status }, { new: true })
+
+    return res.status(200).json({
+      success: true,
+      message: "Submission status updated successfully.",
+      data: updatedSubmission,
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+/**
+ * @route   DELETE /api/submissions/:id
+ * @desc    Delete submission by ID
+ * @params  { id }
+ * @returns Success message
+ */
+export const DeleteSubmission = async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const submission = await Submission.findById(id)
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission not found." })
+    }
+
+    await Submission.findByIdAndDelete(id)
+
+    return res.status(200).json({
+      success: true,
+      message: "Submission deleted successfully.",
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}

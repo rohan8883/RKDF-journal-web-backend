@@ -1,5 +1,5 @@
 import express from 'express';
-import { changePassword } from '../../controller/AuthControllerchangepassword.js'; // Adjust the path as needed
+import { changePassword } from '../../controllers/AuthControllerchangepassword.js'; // Adjust the path as needed
 
 const router = express.Router();
 

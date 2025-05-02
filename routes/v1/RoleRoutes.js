@@ -6,7 +6,7 @@ import {
   DeleteRole,
   GetRoleById,
   UpdateRoleStatus
-} from '../../controller/RoleController.js';
+} from '../../controllers/role.controller.js';
 
 const router = useRouter.Router();
 

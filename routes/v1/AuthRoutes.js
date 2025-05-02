@@ -5,7 +5,7 @@ import {
   Register,
   ForgotPassword,
   ResetPassword
-} from '../../controller/AuthController.js';
+} from '../../controllers/AuthController.js';
 
 const router = useRouter.Router();
 router.post('/login-with-cookie', LoginWithCookie); // endpoint: /auth/login-with-cookie

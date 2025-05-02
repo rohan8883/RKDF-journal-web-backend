@@ -1,5 +1,5 @@
-import Users from '../models/user.model.js';
-import { compare, generateToken, hash, verifyToken } from '../utils/index.js';
+import Users from '../models/person.model.js';
+import { compare, hash, verifyToken } from '../utils/index.js';
 
 export async function changePassword(req, res) {
   const { currentPassword, newPassword, confirmPassword } = req.body;

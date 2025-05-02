@@ -1,4 +1,4 @@
-import Users from '../models/user.model.js';
+import Users from '../models/person.model.js';
 import { compare, generateToken, hash, verifyToken } from '../utils/index.js';
 import { forgetPasswordMailer } from '../utils/nodemailer/forgetPasswordMailer.js';
 

@@ -210,3 +210,5 @@ export async function UpdateRoleStatus(req, res) {
     });
   }
 }
+
+// ════════════════════════════║  API TO Get role list By Role wise For Super Admin or State Admin or Ulb Amdin ║═════════════════════════════════//
