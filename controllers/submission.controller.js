@@ -1,5 +1,5 @@
 import Submission from "../models/submission.model.js"
-import Person from "../models/person.model.js"
+import Person from "../models/user.model.js"
 import Journal from "../models/journal.model.js"
 
 /**

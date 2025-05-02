@@ -1,4 +1,4 @@
-import Users from '../models/person.model.js';
+import Users from '../models/user.model.js';
 import { compare, hash, verifyToken } from '../utils/index.js';
 
 export async function changePassword(req, res) {

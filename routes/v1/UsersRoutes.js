@@ -1,16 +1,24 @@
 import useRouter from 'express';
 import {
-  CreatePerson,
-  GetAllPersons,
-  GetPersonById,
-  UpdatePerson, 
-} from '../../controllers/person.controller.js';
+  GetUser,
+  CreateUser,
+  UpdatePermission,
+  GetUserWithId,
+  GetAllUsers,
+  UploadProfileImage,
+  UpdateUser, 
+  UpdateUserAdmin, 
+} from '../../controllers/UserController.js';
 
 const router = useRouter.Router();
 
-router.get('/get-user', CreatePerson); // endpoint: /user/get-user
-router.get('/get-all-user', GetAllPersons); // endpoint: /user/get-all-user?limit=10&page=1
-router.put('/update-profile', UpdatePerson); // endpoint: /user/update-profile {fullName, mobile, address}
-router.get('/edit/:id', GetPersonById); // endpoint: /user/edit/:id
+router.get('/get-user', GetUser); // endpoint: /user/get-user
+router.get('/get-all-user', GetAllUsers); // endpoint: /user/get-all-user?limit=10&page=1
+router.put('/upload-image-url', UploadProfileImage); // endpoint: /user/upload-image-url {imageUrl}
+router.put('/update-profile', UpdateUser); // endpoint: /user/update-profile {fullName, mobile, address}
+router.get('/edit/:id', GetUserWithId); // endpoint: /user/edit/:id
+router.put('/update-user/:id', UpdateUserAdmin); // endpoint: /user/update-user/:id {fullName, mobile, email, status, role}
+router.put('/update-permission/:id', UpdatePermission); // endpoint: /user/update-permission/:id {permission}
+router.post('/create-user', CreateUser);
  
 export default router;

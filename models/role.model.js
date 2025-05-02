@@ -10,5 +10,5 @@ const roleSchema = new Schema({
 })
 
 roleSchema.plugin(aggregatePaginate)
-const Role = model("Role", roleSchema)
+const Role = model("tbl_roles_mstrs", roleSchema)
 export default Role
