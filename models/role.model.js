@@ -2,7 +2,7 @@ import { model, Schema } from "mongoose"
 import aggregatePaginate from "mongoose-aggregate-paginate-v2"
 
 const roleSchema = new Schema({
-  name: { type: String, required: true },
+  roleName: { type: String, required: true },
   description: { type: String },
   permissions: [{ type: String }],
   status: { type: Number, default: 1 },

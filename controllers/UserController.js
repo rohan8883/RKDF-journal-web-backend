@@ -442,7 +442,7 @@ export async function UpdatePermission(req, res) {
 // ════════════════════════════║  API TO Create User  ║═════════════════════════════════//
 
 export async function CreateUser(req, res) {
-  const { fullName,familyName,email, mobile,affiliation,password } = req.body;
+  const { fullName,familyName,email,userName, mobile,affiliation,password } = req.body;
   console.log("req.body",req.body);
   
   const img = req.files;
@@ -460,6 +460,7 @@ export async function CreateUser(req, res) {
     const createUser = await Users.create({
       fullName,
       familyName,
+      userName,
       affiliation,
       email,
       mobile,
