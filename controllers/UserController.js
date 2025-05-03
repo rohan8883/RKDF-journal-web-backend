@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Users from '../models/user.model.js';
+import Role from '../models/role.model.js';
 import { uploadFile } from '../middleware/_multer.js';
 import { hash } from '../utils/index.js';
 
@@ -392,6 +393,44 @@ export async function UpdateUser(req, res) {
     res.status(500).json({ success: false, message: error.message });
   }
 }
+
+export async function UpdateUserRole(req, res) {
+  try {
+    const { id } = req.params;
+    const { roleId } = req.body;
+
+    if (!roleId) {
+      return res.status(400).json({ success: false, message: "roleId is required" });
+    }
+
+    const updatedUser = await Users.findByIdAndUpdate(
+      id,
+      { roleId },
+      { new: true }
+    ).populate('roleId'); // Optional: populate role info
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User role updated successfully",
+      user: {
+        _id: updatedUser._id,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        mobile: updatedUser.mobile,
+        roleId: updatedUser.roleId._id,
+        role: updatedUser.roleId.roleName, // if populated
+      }
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 export async function UpdateUserAdmin(req, res) {
   const { id } = req.params;
   const { fullName, mobile, email, status, roleId } = req.body;
@@ -456,6 +495,7 @@ export async function CreateUser(req, res) {
         message: 'Email already exists'
       });
     }
+    const authorRole = await Role.findOne({ roleName: 'Author' });
     const hashPassword = await hash(String(password));
     const createUser = await Users.create({
       fullName,
@@ -464,6 +504,7 @@ export async function CreateUser(req, res) {
       affiliation,
       email,
       mobile,
+      roleId: authorRole?._id,
       password: hashPassword,
     });
     return res.status(200).json({

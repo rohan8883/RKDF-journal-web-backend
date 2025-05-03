@@ -5,10 +5,10 @@ const router = useRouter.Router();
 // Journal routes
 router.post("/create-journals", journalController.CreateJournal)
 router.get("/get-all-journals", journalController.GetAllJournals)
-router.get("/gey-by-id-journals/:id", journalController.GetJournalById)
+router.get("/get-journals-by-id/:id", journalController.GetJournalById)
 router.put("/update-journals/:id", journalController.UpdateJournal)
 router.delete("/delete-journals/:id", journalController.DeleteJournal)
-router.patch("/journals/:id/toggle-status", journalController.ToggleJournalStatus)
+router.put("/update-journals-status/:id", journalController.ToggleJournalStatus)
 
 
 export default router;
