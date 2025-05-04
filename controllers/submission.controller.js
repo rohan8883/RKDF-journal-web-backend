@@ -10,13 +10,14 @@ import Journal from "../models/journal.model.js"
  */
 export async function CreateSubmission(req, res) {
   try {
-    const { title, abstract, keywords, submittedBy, journalId, manuscriptFile, coverLetter } = req.body
+    const { title, abstract, keywords, journalId, manuscriptFile, coverLetter } = req.body
+    const submittedBy = req.user._id // 🟢 Get user ID from token
 
-    if (!title || !abstract || !submittedBy || !journalId || !manuscriptFile) {
+    if (!title || !abstract || !journalId || !manuscriptFile) {
       return res.status(400).json({ success: false, message: "Missing required fields" })
     }
 
-    // Verify person exists
+    // Verify person exists (optional if user is already authenticated)
     const personExists = await Person.findById(submittedBy)
     if (!personExists) {
       return res.status(404).json({ success: false, message: "Person not found" })
@@ -64,7 +65,7 @@ export const GetAllSubmissions = async (req, res) => {
       { $sort: { submissionDate: -1 } },
       {
         $lookup: {
-          from: "people",
+          from: "users",
           localField: "submittedBy",
           foreignField: "_id",
           as: "author",

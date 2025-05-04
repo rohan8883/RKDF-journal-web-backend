@@ -10,5 +10,4 @@ router.put("/update-submissions/:id", submissionController.UpdateSubmission)
 router.patch("/submissions/:id/status", submissionController.UpdateSubmissionStatus)
 router.delete("/delete-submissions/:id", submissionController.DeleteSubmission)
 
-
 export default router;
