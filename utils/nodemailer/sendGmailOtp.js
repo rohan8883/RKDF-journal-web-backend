@@ -21,7 +21,7 @@ export const sendGmailOtp = async ({
 		from: process.env.GMAIL_ID || "imonn439@gmail.com",
 		to: email,
 		subject: "Verification Code",
-		text: "OTP GymSphere",
+		text: "OTP RKDF",
 		html: otpTemplate({
 			otp
 		}),
