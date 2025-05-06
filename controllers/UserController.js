@@ -481,11 +481,18 @@ export async function UpdatePermission(req, res) {
 // ════════════════════════════║  API TO Create User  ║═════════════════════════════════//
 
 export async function CreateUser(req, res) {
-  const { fullName,familyName,email,userName, mobile,affiliation,password } = req.body;
-  console.log("req.body",req.body);
+  const {
+    fullName,
+    familyName,
+    email,
+    userName,
+    mobile,
+    affiliation,
+    password,
+    roleId, // optional
+  } = req.body;
   
   const img = req.files;
-  console.log('Creating user', img);
 
   try {
     const checkEmail = await Users.findOne({ email });
@@ -495,7 +502,13 @@ export async function CreateUser(req, res) {
         message: 'Email already exists'
       });
     }
-    const authorRole = await Role.findOne({ roleName: 'Author' });
+
+    let finalRoleId = roleId;
+    if (!finalRoleId) {
+      const authorRole = await Role.findOne({ roleName: 'Author' });
+      finalRoleId = authorRole?._id;
+    }
+
     const hashPassword = await hash(String(password));
     const createUser = await Users.create({
       fullName,
@@ -504,9 +517,10 @@ export async function CreateUser(req, res) {
       affiliation,
       email,
       mobile,
-      roleId: authorRole?._id,
+      roleId: finalRoleId,
       password: hashPassword,
     });
+
     return res.status(200).json({
       success: true,
       userDetails: createUser,
@@ -516,6 +530,7 @@ export async function CreateUser(req, res) {
     res.status(400).json(err);
   }
 }
+
 
 // ════════════════════════════║  API TO Update Users Status By Id ║═════════════════════════════════//
 

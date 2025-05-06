@@ -5,8 +5,8 @@ import { otpTemplate } from './template/otpTemplate.js';
 const transporter = nodemailer.createTransport({
 	service: "gmail",
 	auth: {
-		user: process.env.GMAIL_ID || 'imonn439@gmail.com',
-		pass: process.env.GMAIL_APP_PASSWORD || 'zcrt gfky vvsr omwy',
+		user: process.env.GMAIL_ID || 'rohansingh9135@gmail.com',
+		pass: process.env.GMAIL_APP_PASSWORD || 'rgwaydktkdnjrbyn',
 	},
 });
 
@@ -18,7 +18,7 @@ export const sendGmailOtp = async ({
 }) => {
 
 	const mailOptions = {
-		from: process.env.GMAIL_ID || "imonn439@gmail.com",
+		from: process.env.GMAIL_ID || "rohansingh9135@gmail.com",
 		to: email,
 		subject: "Verification Code",
 		text: "OTP RKDF",
