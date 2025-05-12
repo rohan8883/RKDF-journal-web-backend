@@ -88,7 +88,7 @@ export async function CreateSubmission(req, res) {
         submittedBy,
         journalId,
         manuscriptFile: req.file.filename,
-        fullManuscriptUrl: `${process.env.BACKEND_URL}/uploads/manuscripts/${req.file.filename}`
+        fullManuscriptUrl: `${process.env.BACKEND_URL}/${req.file.filename}`
       });
 
       await submission.save();

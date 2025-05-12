@@ -8,7 +8,7 @@ const issueSchema = new Schema({
   title: { type: String, required: true },
   publicationDate: { type: Date, required: true },
   description: { type: String },
-  coverImage: { type: String },
+  // coverImage: { type: String },
   status: { type: Number, default: 1 },
   createdAt: { type: Date, default: Date.now },
 })
