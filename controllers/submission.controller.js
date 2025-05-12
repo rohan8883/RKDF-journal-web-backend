@@ -49,14 +49,17 @@ import { uploadFile } from '../middleware/_multer.js';
 //     res.status(400).json({ success: false, message: error.message })
 //   }
 // }
-const upload = uploadFile('./uploads/manuscripts');
- export function CreateSubmission(req, res) {
-  upload.single('manuscriptFile')(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ success: false, message: err.message });
-    }
+export async function CreateSubmission(req, res) {
+  const upload = await uploadFile('./uploads/manuscripts');
+  try {
+    await upload.single('manuscriptFile')(req, res, async (err) => {
+      console.log("nnbnb=>", req.file);
 
-    try {
+      if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
+
       const { title, abstract, keywords, journalId } = req.body;
       const submittedBy = req.user._id; // Assuming user is authenticated and added to req.user
 
@@ -95,10 +98,11 @@ const upload = uploadFile('./uploads/manuscripts');
         message: "Submission created successfully",
         data: submission
       });
-    } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
-    }
-  });
+
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
 }
 
 
