@@ -36,6 +36,7 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, '/uploads/profile/')));
 app.use(express.static(path.join(__dirname, '/uploads/transaction/')));
+app.use(express.static(path.join(__dirname, '/uploads/manuscripts/')));
 // routes
 app.use('/api', rootRouter);
 // routes end

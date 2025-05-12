@@ -1,54 +1,106 @@
 import Submission from "../models/submission.model.js"
 import Person from "../models/user.model.js"
 import Journal from "../models/journal.model.js"
-
+import { uploadFile } from '../middleware/_multer.js';
 /**
  * @route   POST /api/submissions
  * @desc    Create a new submission
  * @body    { title, abstract, keywords, submittedBy, journalId, manuscriptFile, coverLetter }
  * @returns Submission object
  */
-export async function CreateSubmission(req, res) {
-  try {
-    const { title, abstract, keywords, journalId, manuscriptFile, coverLetter } = req.body
-    const submittedBy = req.user._id // 🟢 Get user ID from token
+// export async function CreateSubmission(req, res) {
+//   try {
+//     const { title, abstract, keywords, journalId, manuscriptFile, coverLetter } = req.body
+//     const submittedBy = req.user._id // 🟢 Get user ID from token
 
-    if (!title || !abstract || !journalId || !manuscriptFile) {
-      return res.status(400).json({ success: false, message: "Missing required fields" })
+//     if (!title || !abstract || !journalId || !manuscriptFile) {
+//       return res.status(400).json({ success: false, message: "Missing required fields" })
+//     }
+
+//     // Verify person exists (optional if user is already authenticated)
+//     const personExists = await Person.findById(submittedBy)
+//     if (!personExists) {
+//       return res.status(404).json({ success: false, message: "Person not found" })
+//     }
+
+//     // Verify journal exists
+//     const journalExists = await Journal.findById(journalId)
+//     if (!journalExists) {
+//       return res.status(404).json({ success: false, message: "Journal not found" })
+//     }
+
+//     const submission = new Submission({
+//       title,
+//       abstract,
+//       keywords,
+//       submittedBy,
+//       journalId,
+//       manuscriptFile,
+//       coverLetter,
+//     })
+
+//     await submission.save()
+//     res.status(201).json({
+//       success: true,
+//       message: "Submission created successfully",
+//       data: submission,
+//     })
+//   } catch (error) {
+//     res.status(400).json({ success: false, message: error.message })
+//   }
+// }
+const upload = uploadFile('./uploads/manuscripts');
+ export function CreateSubmission(req, res) {
+  upload.single('manuscriptFile')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
     }
 
-    // Verify person exists (optional if user is already authenticated)
-    const personExists = await Person.findById(submittedBy)
-    if (!personExists) {
-      return res.status(404).json({ success: false, message: "Person not found" })
+    try {
+      const { title, abstract, keywords, journalId } = req.body;
+      const submittedBy = req.user._id; // Assuming user is authenticated and added to req.user
+
+      // Validate required fields
+      if (!title || !abstract || !journalId || !req.file) {
+        return res.status(400).json({ success: false, message: "Missing required fields" });
+      }
+
+      // Check if person exists
+      const personExists = await Person.findById(submittedBy);
+      if (!personExists) {
+        return res.status(404).json({ success: false, message: "Person not found" });
+      }
+
+      // Check if journal exists
+      const journalExists = await Journal.findById(journalId);
+      if (!journalExists) {
+        return res.status(404).json({ success: false, message: "Journal not found" });
+      }
+
+      // Create submission
+      const submission = new Submission({
+        title,
+        abstract,
+        keywords,
+        submittedBy,
+        journalId,
+        manuscriptFile: req.file.filename,
+        fullManuscriptUrl: `${process.env.BACKEND_URL}/uploads/manuscripts/${req.file.filename}`
+      });
+
+      await submission.save();
+
+      return res.status(201).json({
+        success: true,
+        message: "Submission created successfully",
+        data: submission
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
     }
-
-    // Verify journal exists
-    const journalExists = await Journal.findById(journalId)
-    if (!journalExists) {
-      return res.status(404).json({ success: false, message: "Journal not found" })
-    }
-
-    const submission = new Submission({
-      title,
-      abstract,
-      keywords,
-      submittedBy,
-      journalId,
-      manuscriptFile,
-      coverLetter,
-    })
-
-    await submission.save()
-    res.status(201).json({
-      success: true,
-      message: "Submission created successfully",
-      data: submission,
-    })
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message })
-  }
+  });
 }
+
 
 /**
  * @route   GET /api/submissions

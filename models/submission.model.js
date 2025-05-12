@@ -14,7 +14,8 @@ const submissionSchema = new Schema({
     default: "submitted",
   },
   manuscriptFile: String,
-  coverLetter: String,
+  fullManuscriptUrl: String,
+  // coverLetter: String,
   createdAt: { type: Date, default: Date.now },
 
   // NEW FIELD: assigned reviewers and their comments
