@@ -3,7 +3,7 @@ import aggregatePaginate from "mongoose-aggregate-paginate-v2"
 
 const journalRoleSchema = new Schema({
   journalId: { type: Schema.Types.ObjectId, ref: "Journal", required: true },
-  personId: { type: Schema.Types.ObjectId, ref: "Person", required: true },
+  personId: { type: Schema.Types.ObjectId, ref: "users", required: true },
   roleId: { type: Schema.Types.ObjectId, ref: "Role", required: true },
   startDate: { type: Date, default: Date.now },
   endDate: { type: Date },

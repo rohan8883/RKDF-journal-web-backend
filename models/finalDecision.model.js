@@ -9,7 +9,7 @@ const finalDecisionSchema = new Schema({
     required: true,
   },
   decisionDate: { type: Date, default: Date.now },
-  decisionBy: { type: Schema.Types.ObjectId, ref: "Person", required: true },
+  decisionBy: { type: Schema.Types.ObjectId, ref: "users", required: true },
   comments: { type: String },
   createdAt: { type: Date, default: Date.now },
 })
