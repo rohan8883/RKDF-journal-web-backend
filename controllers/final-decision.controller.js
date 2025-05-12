@@ -1,52 +1,54 @@
+import FinalDecision from "../models/final-decision.model.js"
 import Article from "../models/article.model.js"
-import Issue from "../models/issue.model.js"
-import Submission from "../models/submission.model.js"
+import User from "../models/user.model.js"
 
 /**
- * @route   POST /api/articles
- * @desc    Create a new article
- * @body    { title, abstract, keywords, issueId, submissionId, doi, pages, publicationDate, fullText }
- * @returns Article object
+ * @route   POST /api/final-decisions
+ * @desc    Create a new final decision
+ * @body    { articleId, decision, decisionBy, comments }
+ * @returns FinalDecision object
  */
-export async function CreateArticle(req, res) {
+export const createFinalDecision = async (req, res) => {
   try {
-    const { title, abstract, keywords, issueId, submissionId, doi, pages, publicationDate, fullText } = req.body
+    const { articleId, decision, decisionBy, comments } = req.body
 
-    if (!title || !abstract || !issueId || !fullText) {
+    if (!articleId || !decision || !decisionBy) {
       return res.status(400).json({ success: false, message: "Missing required fields" })
     }
 
-    // Verify issue exists
-    const issueExists = await Issue.findById(issueId)
-    if (!issueExists) {
-      return res.status(404).json({ success: false, message: "Issue not found" })
+    // Verify article exists
+    const articleExists = await Article.findById(articleId)
+    if (!articleExists) {
+      return res.status(404).json({ success: false, message: "Article not found" })
     }
 
-    // If submissionId is provided, verify it exists
-    if (submissionId) {
-      const submissionExists = await Submission.findById(submissionId)
-      if (!submissionExists) {
-        return res.status(404).json({ success: false, message: "Submission not found" })
-      }
+    // Verify decision maker exists
+    const decisionMakerExists = await User.findById(decisionBy)
+    if (!decisionMakerExists) {
+      return res.status(404).json({ success: false, message: "Decision maker not found" })
     }
 
-    const article = new Article({
-      title,
-      abstract,
-      keywords,
-      issueId,
-      submissionId,
-      doi,
-      pages,
-      publicationDate,
-      fullText,
+    // Check if a final decision already exists for this article
+    const existingDecision = await FinalDecision.findOne({ articleId })
+    if (existingDecision) {
+      return res.status(400).json({
+        success: false,
+        message: "A final decision already exists for this article",
+      })
+    }
+
+    const finalDecision = new FinalDecision({
+      articleId,
+      decision,
+      decisionBy,
+      comments,
     })
 
-    await article.save()
+    await finalDecision.save()
     res.status(201).json({
       success: true,
-      message: "Article created successfully",
-      data: article,
+      message: "Final decision created successfully",
+      data: finalDecision,
     })
   } catch (error) {
     res.status(400).json({ success: false, message: error.message })
@@ -54,70 +56,68 @@ export async function CreateArticle(req, res) {
 }
 
 /**
- * @route   GET /api/articles
- * @desc    Get all articles with pagination and search
- * @query   { page, limit, q, issueId }
- * @returns Paginated articles
+ * @route   GET /api/final-decisions
+ * @desc    Get all final decisions with pagination and filtering
+ * @query   { page, limit, articleId, decision, decisionBy }
+ * @returns Paginated final decisions
  */
-export const GetAllArticles = async (req, res) => {
-  const { page = 1, limit = 10, q, issueId } = req.query
+export const getAllFinalDecisions = async (req, res) => {
+  const { page = 1, limit = 10, articleId, decision, decisionBy } = req.query
   const options = { page, limit }
 
   try {
     const query = [
-      { $sort: { createdAt: -1 } },
+      { $sort: { decisionDate: -1 } },
       {
         $lookup: {
-          from: "issues",
-          localField: "issueId",
+          from: "articles",
+          localField: "articleId",
           foreignField: "_id",
-          as: "issue",
+          as: "article",
         },
       },
-      { $unwind: "$issue" },
+      { $unwind: "$article" },
       {
         $lookup: {
-          from: "journals",
-          localField: "issue.journalId",
+          from: "users",
+          localField: "decisionBy",
           foreignField: "_id",
-          as: "journal",
+          as: "decisionMaker",
         },
       },
-      { $unwind: "$journal" },
-      { $project: { __v: 0, "issue.__v": 0, "journal.__v": 0 } },
+      { $unwind: "$decisionMaker" },
+      { $project: { __v: 0, "article.__v": 0, "decisionMaker.__v": 0, "decisionMaker.password": 0 } },
     ]
 
-    if (issueId) {
+    if (articleId) {
       query.push({
-        $match: { issueId: { $eq: issueId } },
+        $match: { articleId: { $eq: articleId } },
       })
     }
 
-    if (q) {
+    if (decision) {
       query.push({
-        $match: {
-          $or: [
-            { title: { $regex: new RegExp(q, "i") } },
-            { abstract: { $regex: new RegExp(q, "i") } },
-            { keywords: { $regex: new RegExp(q, "i") } },
-            { "issue.title": { $regex: new RegExp(q, "i") } },
-            { "journal.title": { $regex: new RegExp(q, "i") } },
-          ],
-        },
+        $match: { decision: { $eq: decision } },
       })
     }
 
-    const aggregate = Article.aggregate(query)
-    const articles = await Article.aggregatePaginate(aggregate, options)
+    if (decisionBy) {
+      query.push({
+        $match: { decisionBy: { $eq: decisionBy } },
+      })
+    }
 
-    if (!articles.totalDocs) {
+    const aggregate = FinalDecision.aggregate(query)
+    const finalDecisions = await FinalDecision.aggregatePaginate(aggregate, options)
+
+    if (!finalDecisions.totalDocs) {
       return res.status(404).json({ success: false, message: "No records found!" })
     }
 
     return res.status(200).json({
       success: true,
-      message: "Articles fetched successfully.",
-      data: articles,
+      message: "Final decisions fetched successfully.",
+      data: finalDecisions,
     })
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message })
@@ -125,32 +125,25 @@ export const GetAllArticles = async (req, res) => {
 }
 
 /**
- * @route   GET /api/articles/:id
- * @desc    Get article by ID
+ * @route   GET /api/final-decisions/:id
+ * @desc    Get final decision by ID
  * @params  { id }
- * @returns Article object
+ * @returns FinalDecision object
  */
-export const GetArticleById = async (req, res) => {
+export const getFinalDecisionById = async (req, res) => {
   const { id } = req.params
 
   try {
-    const article = await Article.findById(id)
-      .populate({
-        path: "issueId",
-        populate: {
-          path: "journalId",
-        },
-      })
-      .populate("submissionId")
+    const finalDecision = await FinalDecision.findById(id).populate("articleId").populate("decisionBy", "-password")
 
-    if (!article) {
-      return res.status(404).json({ success: false, message: "Article not found." })
+    if (!finalDecision) {
+      return res.status(404).json({ success: false, message: "Final decision not found." })
     }
 
     return res.status(200).json({
       success: true,
-      message: "Article fetched successfully.",
-      data: article,
+      message: "Final decision fetched successfully.",
+      data: finalDecision,
     })
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message })
@@ -158,43 +151,62 @@ export const GetArticleById = async (req, res) => {
 }
 
 /**
- * @route   PUT /api/articles/:id
- * @desc    Update article by ID
+ * @route   GET /api/final-decisions/article/:articleId
+ * @desc    Get final decision by article ID
+ * @params  { articleId }
+ * @returns FinalDecision object
+ */
+export const getFinalDecisionByArticleId = async (req, res) => {
+  const { articleId } = req.params
+
+  try {
+    const finalDecision = await FinalDecision.findOne({ articleId })
+      .populate("articleId")
+      .populate("decisionBy", "-password")
+
+    if (!finalDecision) {
+      return res.status(404).json({ success: false, message: "Final decision not found for this article." })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Final decision fetched successfully.",
+      data: finalDecision,
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+/**
+ * @route   PUT /api/final-decisions/:id
+ * @desc    Update final decision by ID
  * @params  { id }
- * @body    { title, abstract, keywords, issueId, submissionId, doi, pages, publicationDate, fullText }
+ * @body    { decision, comments }
  * @returns Success message
  */
-export const UpdateArticle = async (req, res) => {
+export const updateFinalDecision = async (req, res) => {
   const { id } = req.params
-  const updateFields = req.body
+  const { decision, comments } = req.body
 
   try {
-    const article = await Article.findById(id)
-    if (!article) {
-      return res.status(404).json({ success: false, message: "Article not found." })
+    const finalDecision = await FinalDecision.findById(id)
+    if (!finalDecision) {
+      return res.status(404).json({ success: false, message: "Final decision not found." })
     }
 
-    // If issueId is being updated, verify it exists
-    if (updateFields.issueId) {
-      const issueExists = await Issue.findById(updateFields.issueId)
-      if (!issueExists) {
-        return res.status(404).json({ success: false, message: "Issue not found" })
-      }
-    }
+    const updateFields = {}
+    if (decision) updateFields.decision = decision
+    if (comments !== undefined) updateFields.comments = comments
 
-    // If submissionId is being updated, verify it exists
-    if (updateFields.submissionId) {
-      const submissionExists = await Submission.findById(updateFields.submissionId)
-      if (!submissionExists) {
-        return res.status(404).json({ success: false, message: "Submission not found" })
-      }
-    }
+    // Update decision date when decision is modified
+    if (decision) updateFields.decisionDate = Date.now()
 
-    await Article.findByIdAndUpdate(id, updateFields, { new: true })
+    await FinalDecision.findByIdAndUpdate(id, updateFields, { new: true })
 
     return res.status(200).json({
       success: true,
-      message: "Article updated successfully.",
+      message: "Final decision updated successfully.",
     })
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message })
@@ -202,67 +214,27 @@ export const UpdateArticle = async (req, res) => {
 }
 
 /**
- * @route   DELETE /api/articles/:id
- * @desc    Delete article by ID
+ * @route   DELETE /api/final-decisions/:id
+ * @desc    Delete final decision by ID
  * @params  { id }
  * @returns Success message
  */
-export const DeleteArticle = async (req, res) => {
+export const deleteFinalDecision = async (req, res) => {
   const { id } = req.params
 
   try {
-    const article = await Article.findById(id)
-    if (!article) {
-      return res.status(404).json({ success: false, message: "Article not found." })
+    const finalDecision = await FinalDecision.findById(id)
+    if (!finalDecision) {
+      return res.status(404).json({ success: false, message: "Final decision not found." })
     }
 
-    await Article.findByIdAndDelete(id)
+    await FinalDecision.findByIdAndDelete(id)
 
     return res.status(200).json({
       success: true,
-      message: "Article deleted successfully.",
+      message: "Final decision deleted successfully.",
     })
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message })
-  }
-}
-
-/**
- * @route   PATCH /api/articles/:id/toggle-status
- * @desc    Toggle article status
- * @params  { id }
- * @returns Updated article
- */
-export async function ToggleArticleStatus(req, res) {
-  const { id } = req.params
-
-  try {
-    const article = await Article.findOne({ _id: id })
-
-    if (!article) {
-      return res.status(404).json({
-        success: false,
-        message: "Article not found",
-      })
-    }
-
-    const updatedArticle = await Article.findOneAndUpdate(
-      { _id: id },
-      {
-        status: article?.status == 1 ? 0 : 1,
-      },
-      { new: true },
-    )
-
-    return res.status(200).json({
-      success: true,
-      message: updatedArticle?.status == 1 ? "Article is Activated" : "Article is Deactivated",
-      data: updatedArticle,
-    })
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    })
   }
 }
