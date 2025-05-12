@@ -16,5 +16,5 @@ const reviewRoundSchema = new Schema({
 })
 
 reviewRoundSchema.plugin(aggregatePaginate)
-const ReviewRound = model("ReviewRound", reviewRoundSchema)
+const ReviewRound = model("review_round", reviewRoundSchema)
 export default ReviewRound

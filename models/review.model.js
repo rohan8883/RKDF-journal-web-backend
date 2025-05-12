@@ -3,7 +3,7 @@ import aggregatePaginate from "mongoose-aggregate-paginate-v2"
 
 const reviewSchema = new Schema({
   reviewRoundId: { type: Schema.Types.ObjectId, ref: "ReviewRound", required: true },
-  reviewerId: { type: Schema.Types.ObjectId, ref: "Person", required: true },
+  reviewerId: { type: Schema.Types.ObjectId, ref: "users", required: true },
   submissionId: { type: Schema.Types.ObjectId, ref: "Submission", required: true },
   recommendation: {
     type: String,

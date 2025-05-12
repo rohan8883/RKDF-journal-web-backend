@@ -15,5 +15,5 @@ const finalDecisionSchema = new Schema({
 })
 
 finalDecisionSchema.plugin(aggregatePaginate)
-const FinalDecision = model("FinalDecision", finalDecisionSchema)
+const FinalDecision = model("Final_decision", finalDecisionSchema)
 export default FinalDecision

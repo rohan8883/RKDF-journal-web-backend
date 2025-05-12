@@ -8,5 +8,5 @@ const articleSubjectSchema = new Schema({
 })
 
 articleSubjectSchema.plugin(aggregatePaginate)
-const ArticleSubject = model("ArticleSubject", articleSubjectSchema)
+const ArticleSubject = model("Article_subject", articleSubjectSchema)
 export default ArticleSubject
