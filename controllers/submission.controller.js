@@ -1,6 +1,7 @@
 import Submission from "../models/submission.model.js"
 import Person from "../models/user.model.js"
 import Journal from "../models/journal.model.js"
+import mongoose from 'mongoose';
 import { uploadFile } from '../middleware/_multer.js';
 /**
  * @route   POST /api/submissions
@@ -104,7 +105,62 @@ export async function CreateSubmission(req, res) {
     return res.status(500).json({ success: false, message: error.message });
   }
 }
+ 
+export const AssignReviewer = async (req, res) => {
+  const { submissionId, reviewerId } = req.body;
 
+  if (!submissionId || !reviewerId) {
+    return res.status(400).json({
+      success: false,
+      message: "submissionId and reviewerId are required",
+    });
+  }
+
+  try {
+    const submission = await Submission.findById(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: "Submission not found.",
+      });
+    }
+
+    // Check if the reviewer is already assigned
+    const alreadyAssigned = submission.reviewerAssignments.some(
+      (assignment) => assignment.reviewer.toString() === reviewerId
+    );
+
+    if (alreadyAssigned) {
+      return res.status(400).json({
+        success: false,
+        message: "Reviewer is already assigned to this submission.",
+      });
+    }
+
+    // Push new reviewer assignment
+    submission.reviewerAssignments.push({
+      reviewer: reviewerId,
+      comment: "",
+      commentedAt: null,
+    });
+
+    // Optionally update status to under_review if this is the first reviewer
+    if (submission.status === "submitted") {
+      submission.status = "under_review";
+    }
+
+    await submission.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Reviewer assigned successfully.",
+      data: submission,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 /**
  * @route   GET /api/submissions
@@ -112,12 +168,266 @@ export async function CreateSubmission(req, res) {
  * @query   { page, limit, q, journalId, submittedBy, status }
  * @returns Paginated submissions
  */
+// export const GetAllSubmissions = async (req, res) => {
+//   const { page = 1, limit = 10, q, journalId, submittedBy, status } = req.query
+//   const options = { page, limit }
+
+//   try {
+//     const query = [
+//       { $sort: { submissionDate: -1 } },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "submittedBy",
+//           foreignField: "_id",
+//           as: "author",
+//         },
+//       },
+//       { $unwind: "$author" },
+//       {
+//         $lookup: {
+//           from: "journals",
+//           localField: "journalId",
+//           foreignField: "_id",
+//           as: "journal",
+//         },
+//       },
+//       { $unwind: "$journal" },
+//       { $project: { __v: 0, "author.__v": 0, "journal.__v": 0 } },
+//     ]
+
+//     const matchConditions = {}
+
+//     if (journalId) {
+//       matchConditions.journalId = journalId
+//     }
+
+//     if (submittedBy) {
+//       matchConditions.submittedBy = submittedBy
+//     }
+
+//     if (status) {
+//       matchConditions.status = status
+//     }
+
+//     if (Object.keys(matchConditions).length > 0) {
+//       query.push({ $match: matchConditions })
+//     }
+
+//     if (q) {
+//       query.push({
+//         $match: {
+//           $or: [
+//             { title: { $regex: new RegExp(q, "i") } },
+//             { abstract: { $regex: new RegExp(q, "i") } },
+//             { "author.firstName": { $regex: new RegExp(q, "i") } },
+//             { "author.lastName": { $regex: new RegExp(q, "i") } },
+//             { "journal.title": { $regex: new RegExp(q, "i") } },
+//           ],
+//         },
+//       })
+//     }
+
+//     const aggregate = Submission.aggregate(query)
+//     const submissions = await Submission.aggregatePaginate(aggregate, options)
+
+//     if (!submissions.totalDocs) {
+//       return res.status(404).json({ success: false, message: "No records found!" })
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Submissions fetched successfully.",
+//       data: submissions,
+//     })
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message })
+//   }
+// }
+ 
+// export const GetAllSubmissions = async (req, res) => {
+//   const { page = 1, limit = 10, q, journalId, submittedBy, status } = req.query;
+//   const options = { page, limit };
+//   const loggedInUserId = req.user._id;
+
+//   try {
+//     const query = [
+//       { $sort: { submissionDate: -1 } },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "submittedBy",
+//           foreignField: "_id",
+//           as: "author",
+//         },
+//       },
+//       { $unwind: "$author" },
+//       {
+//         $lookup: {
+//           from: "journals",
+//           localField: "journalId",
+//           foreignField: "_id",
+//           as: "journal",
+//         },
+//       },
+//       { $unwind: "$journal" },
+//       { $project: { __v: 0, "author.__v": 0, "journal.__v": 0 } },
+//     ];
+
+//     const matchConditions = {};
+
+//     if (journalId) {
+//       matchConditions.journalId = journalId;
+//     }
+
+//     if (status) {
+//       matchConditions.status = status;
+//     }
+
+//     // Ensure only show submissions made by the logged-in user
+//     matchConditions.submittedBy = new mongoose.Types.ObjectId(loggedInUserId);
+
+//     query.push({ $match: matchConditions });
+
+//     if (q) {
+//       query.push({
+//         $match: {
+//           $or: [
+//             { title: { $regex: new RegExp(q, "i") } },
+//             { abstract: { $regex: new RegExp(q, "i") } },
+//             { "author.firstName": { $regex: new RegExp(q, "i") } },
+//             { "author.lastName": { $regex: new RegExp(q, "i") } },
+//             { "journal.title": { $regex: new RegExp(q, "i") } },
+//           ],
+//         },
+//       });
+//     }
+
+//     const aggregate = Submission.aggregate(query);
+//     const submissions = await Submission.aggregatePaginate(aggregate, options);
+
+//     if (!submissions.totalDocs) {
+//       return res.status(404).json({ success: false, message: "No records found!" });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Submissions fetched successfully.",
+//       data: submissions,
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+ 
+// export const GetAllSubmissions = async (req, res) => {
+//   const { page = 1, limit = 10, q, journalId, status } = req.query;
+//   const options = { page, limit };
+//   const loggedInUserId = req.user._id;
+//   const loggedInUserRoleId = req.user.roleId;  
+//   const adminRoleId = "67193213e0e76d08635e31fb"; 
+
+//   try {
+//     const query = [
+//       { $sort: { submissionDate: -1 } },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "submittedBy",
+//           foreignField: "_id",
+//           as: "author",
+//         },
+//       },
+//       { $unwind: "$author" },
+//       {
+//         $lookup: {
+//           from: "journals",
+//           localField: "journalId",
+//           foreignField: "_id",
+//           as: "journal",
+//         },
+//       },
+//       { $unwind: "$journal" },
+//       { $project: { __v: 0, "author.__v": 0, "journal.__v": 0 } },
+//     ];
+
+//     const matchConditions = {};
+
+//     if (journalId) {
+//       matchConditions.journalId = new mongoose.Types.ObjectId(journalId);
+//     }
+
+//     if (status) {
+//       matchConditions.status = status;
+//     }
+
+//     // If the user is NOT admin, limit to their own submissions
+//     if (loggedInUserRoleId !== adminRoleId) {
+//       matchConditions.submittedBy = new mongoose.Types.ObjectId(loggedInUserId);
+//     }
+
+//     query.push({ $match: matchConditions });
+
+//     if (q) {
+//       query.push({
+//         $match: {
+//           $or: [
+//             { title: { $regex: new RegExp(q, "i") } },
+//             { abstract: { $regex: new RegExp(q, "i") } },
+//             { "author.firstName": { $regex: new RegExp(q, "i") } },
+//             { "author.lastName": { $regex: new RegExp(q, "i") } },
+//             { "journal.title": { $regex: new RegExp(q, "i") } },
+//           ],
+//         },
+//       });
+//     }
+
+//     const aggregate = Submission.aggregate(query);
+//     const submissions = await Submission.aggregatePaginate(aggregate, options);
+
+//     if (!submissions.totalDocs) {
+//       return res.status(404).json({ success: false, message: "No records found!" });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Submissions fetched successfully.",
+//       data: submissions,
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+ 
+
 export const GetAllSubmissions = async (req, res) => {
-  const { page = 1, limit = 10, q, journalId, submittedBy, status } = req.query
-  const options = { page, limit }
+  const { page = 1, limit = 10, q, journalId, status } = req.query;
+  const options = { page, limit };
+  const loggedInUserId = req.user._id;
+  const loggedInUserRoleId = req.user.roleId;
+  const adminRoleId = "67193213e0e76d08635e31fb";
 
   try {
+    const matchConditions = {};
+
+    if (journalId) {
+      matchConditions.journalId = new mongoose.Types.ObjectId(journalId);
+    }
+
+    if (status) {
+      matchConditions.status = status;
+    }
+
+    // Base match for non-admin users
+    if (loggedInUserRoleId !== adminRoleId) {
+      matchConditions.$or = [
+        { submittedBy: new mongoose.Types.ObjectId(loggedInUserId) },
+        { "reviewerAssignments.reviewer": new mongoose.Types.ObjectId(loggedInUserId) }
+      ];
+    }
+
     const query = [
+      { $match: matchConditions },
       { $sort: { submissionDate: -1 } },
       {
         $lookup: {
@@ -138,25 +448,7 @@ export const GetAllSubmissions = async (req, res) => {
       },
       { $unwind: "$journal" },
       { $project: { __v: 0, "author.__v": 0, "journal.__v": 0 } },
-    ]
-
-    const matchConditions = {}
-
-    if (journalId) {
-      matchConditions.journalId = journalId
-    }
-
-    if (submittedBy) {
-      matchConditions.submittedBy = submittedBy
-    }
-
-    if (status) {
-      matchConditions.status = status
-    }
-
-    if (Object.keys(matchConditions).length > 0) {
-      query.push({ $match: matchConditions })
-    }
+    ];
 
     if (q) {
       query.push({
@@ -164,30 +456,31 @@ export const GetAllSubmissions = async (req, res) => {
           $or: [
             { title: { $regex: new RegExp(q, "i") } },
             { abstract: { $regex: new RegExp(q, "i") } },
-            { "author.firstName": { $regex: new RegExp(q, "i") } },
-            { "author.lastName": { $regex: new RegExp(q, "i") } },
+            { "author.fullName": { $regex: new RegExp(q, "i") } },
             { "journal.title": { $regex: new RegExp(q, "i") } },
           ],
         },
-      })
+      });
     }
 
-    const aggregate = Submission.aggregate(query)
-    const submissions = await Submission.aggregatePaginate(aggregate, options)
+    const aggregate = Submission.aggregate(query);
+    const submissions = await Submission.aggregatePaginate(aggregate, options);
 
     if (!submissions.totalDocs) {
-      return res.status(404).json({ success: false, message: "No records found!" })
+      return res.status(404).json({ success: false, message: "No records found!" });
     }
 
     return res.status(200).json({
       success: true,
       message: "Submissions fetched successfully.",
       data: submissions,
-    })
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    return res.status(500).json({ success: false, message: error.message });
   }
-}
+};
+
+
 
 /**
  * @route   GET /api/submissions/:id
@@ -195,25 +488,50 @@ export const GetAllSubmissions = async (req, res) => {
  * @params  { id }
  * @returns Submission object
  */
+// export const GetSubmissionById = async (req, res) => {
+//   const { id } = req.params
+
+//   try {
+//     const submission = await Submission.findById(id).populate("submittedBy").populate("journalId")
+
+//     if (!submission) {
+//       return res.status(404).json({ success: false, message: "Submission not found." })
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Submission fetched successfully.",
+//       data: submission,
+//     })
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message })
+//   }
+// }
+
+
 export const GetSubmissionById = async (req, res) => {
-  const { id } = req.params
+  const { id } = req.params;
 
   try {
-    const submission = await Submission.findById(id).populate("submittedBy").populate("journalId")
+    const submission = await Submission.findById(id)
+      .populate("submittedBy")
+      .populate("journalId")
+      .populate("reviewerAssignments.reviewer"); // <-- populate reviewer data
 
     if (!submission) {
-      return res.status(404).json({ success: false, message: "Submission not found." })
+      return res.status(404).json({ success: false, message: "Submission not found." });
     }
 
     return res.status(200).json({
       success: true,
       message: "Submission fetched successfully.",
       data: submission,
-    })
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    return res.status(500).json({ success: false, message: error.message });
   }
-}
+};
+
 
 /**
  * @route   PUT /api/submissions/:id
@@ -222,34 +540,34 @@ export const GetSubmissionById = async (req, res) => {
  * @body    { title, abstract, keywords, status, manuscriptFile, coverLetter }
  * @returns Success message
  */
-export const UpdateSubmission = async (req, res) => {
-  const { id } = req.params
-  const updateFields = req.body
+  export const UpdateSubmission = async (req, res) => {
+    const { id } = req.params
+    const updateFields = req.body
 
-  try {
-    const submission = await Submission.findById(id)
-    if (!submission) {
-      return res.status(404).json({ success: false, message: "Submission not found." })
-    }
+    try {
+      const submission = await Submission.findById(id)
+      if (!submission) {
+        return res.status(404).json({ success: false, message: "Submission not found." })
+      }
 
-    // Don't allow changing submittedBy or journalId after creation
-    if (updateFields.submittedBy || updateFields.journalId) {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot change submitter or journal after submission is created",
+      // Don't allow changing submittedBy or journalId after creation
+      if (updateFields.submittedBy || updateFields.journalId) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot change submitter or journal after submission is created",
+        })
+      }
+
+      await Submission.findByIdAndUpdate(id, updateFields, { new: true })
+
+      return res.status(200).json({
+        success: true,
+        message: "Submission updated successfully.",
       })
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message })
     }
-
-    await Submission.findByIdAndUpdate(id, updateFields, { new: true })
-
-    return res.status(200).json({
-      success: true,
-      message: "Submission updated successfully.",
-    })
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
   }
-}
 
 /**
  * @route   PATCH /api/submissions/:id/status

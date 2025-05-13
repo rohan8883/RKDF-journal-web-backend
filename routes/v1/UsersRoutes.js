@@ -2,6 +2,7 @@ import useRouter from 'express';
 import {
   GetUser,
   CreateUser,
+  GetAllReviewer,
   UpdatePermission,
   GetUserWithId,
   GetAllUsers,
@@ -14,7 +15,8 @@ import {
 const router = useRouter.Router();
 
 router.get('/get-user', GetUser); // endpoint: /user/get-user
-router.get('/get-all-user', GetAllUsers); // endpoint: /user/get-all-user?limit=10&page=1
+router.get('/get-all-user', GetAllUsers);  
+router.get('/get-all-reviewer', GetAllReviewer);  
 router.put('/upload-image-url', UploadProfileImage); // endpoint: /user/upload-image-url {imageUrl}
 router.put('/update-profile', UpdateUser);  
 router.put('/update-user-role/:id', UpdateUserRole);
