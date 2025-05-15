@@ -4,6 +4,7 @@ import * as submissionController from "../../controllers/submission.controller.j
 const router = useRouter.Router();
 // Submission routes
 router.post("/create-submissions", submissionController.CreateSubmission)
+router.post("/assign-reviewer", submissionController.AssignReviewer)
 router.get("/get-all-submissions", submissionController.GetAllSubmissions)
 router.get("/get-by-id-submissions/:id", submissionController.GetSubmissionById)
 router.put("/update-submissions/:id", submissionController.UpdateSubmission)

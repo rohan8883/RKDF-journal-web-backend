@@ -8,49 +8,41 @@ import { uploadFile } from '../middleware/_multer.js';
  * @returns Issue object
  */
 export async function CreateIssue(req, res) {
-  const upload = uploadFile('./uploads/profile');
+  try {
+    const { journalId, volume, issueNumber, title, publicationDate, description } = req.body;
 
-  await  upload.single('imageUrl')(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ success: false, message: err.message });
+    // Validate required fields
+    if (!journalId || !volume || !issueNumber || !title || !publicationDate) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    try {
-      const { journalId, volume, issueNumber, title, publicationDate, description } = req.body;
-      const coverImage = req.file ? req.file.filename : null;
-
-      if (!journalId || !volume || !issueNumber || !title || !publicationDate) {
-        return res.status(400).json({ success: false, message: "Missing required fields" });
-      }
-      console.log(req.file?.filename);
-      // Verify journal exists
-      const journalExists = await Journal.findById(journalId);
-      if (!journalExists) {
-        return res.status(404).json({ success: false, message: "Journal not found" });
-      }
-
-      const issue = new Issue({
-        journalId,
-        volume,
-        issueNumber,
-        title,
-        publicationDate,
-        description,
-        coverImage,
-      });
-
-      await issue.save();
-
-      return res.status(201).json({
-        success: true,
-        message: "Issue created successfully",
-        data: issue,
-      });
-    } catch (error) {
-      return res.status(500).json({ success: false, message: error.message });
+    // Verify journal exists
+    const journalExists = await Journal.findById(journalId);
+    if (!journalExists) {
+      return res.status(404).json({ success: false, message: "Journal not found" });
     }
-  });
+
+    const issue = new Issue({
+      journalId,
+      volume,
+      issueNumber,
+      title,
+      publicationDate,
+      description,
+    });
+
+    await issue.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Issue created successfully",
+      data: issue,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
 }
+
 
 
 
