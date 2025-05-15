@@ -53,8 +53,7 @@ import { uploadFile } from '../middleware/_multer.js';
 export async function CreateSubmission(req, res) {
   const upload = await uploadFile('./uploads/manuscripts');
   try {
-    await upload.single('manuscriptFile')(req, res, async (err) => {
-      console.log("nnbnb=>", req.file);
+    await upload.single('manuscriptFile')(req, res, async (err) => { 
 
       if (err) {
         return res.status(400).json({ success: false, message: err.message });
@@ -132,7 +131,7 @@ export const AssignReviewer = async (req, res) => {
     );
 
     if (alreadyAssigned) {
-      return res.status(400).json({
+      return res.status(200).json({
         success: false,
         message: "Reviewer is already assigned to this submission.",
       });

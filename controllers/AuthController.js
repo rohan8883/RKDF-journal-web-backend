@@ -125,10 +125,10 @@ export async function ForgotPassword(req, res) {
     const resMail = await forgetPasswordMailer({
       to: oldUser.email,
       subject: 'Password Reset',
-      // text: `https://jobindia-new-client.vercel.app/auth/resetpassword?id=${oldUser._id}&token=${token}`,
-      text: `http://localhost:5173/grievance/auth/citizen-reset-password?id=${oldUser._id}&token=${token}`,
-      // html: `<p>https://jobindia-new-client.vercel.app/auth/resetpassword?id=${oldUser._id}&token=${token}</p>`
-      html: `<p>http://localhost:5173/grievance/auth/citizen-reset-password?id=${oldUser._id}&token=${token}</p>`
+      text: `https://ijhesm.org/auth/resetpassword?id=${oldUser._id}&token=${token}`,
+      // text: `http://localhost:5173/grievance/auth/citizen-reset-password?id=${oldUser._id}&token=${token}`,
+      html: `<p>https://ijhesm.org/auth/resetpassword?id=${oldUser._id}&token=${token}</p>`
+      // html: `<p>http://localhost:5173/grievance/auth/citizen-reset-password?id=${oldUser._id}&token=${token}</p>`
     });
 
     return res.status(200).json({

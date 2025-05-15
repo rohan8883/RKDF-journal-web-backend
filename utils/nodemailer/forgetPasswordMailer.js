@@ -15,7 +15,7 @@ export const forgetPasswordMailer = async ({
     });
 
     let info = await transporter.sendMail({
-        from: 'imonn439@gmail.com', // sender address
+        from: 'rohansingh9135@gmail.com', // sender address
         to, // list of receivers
         subject, // Subject line
         text, // plain text body
