@@ -1,3 +1,4 @@
+// controllers/reviewRound.controller.js
 import ReviewRound from "../models/reviewRound.model.js"
 import Submission from "../models/submission.model.js"
 import Review from "../models/review.model.js"
@@ -56,239 +57,129 @@ export const createReviewRound = async (req, res) => {
 
 /**
  * @route   GET /api/review-rounds
- * @desc    Get all review rounds with pagination and filtering
- * @query   { page, limit, submissionId, status }
- * @returns Paginated review rounds
+ * @desc    Get all review rounds for a submission
+ * @query   submissionId
+ * @returns Array of ReviewRound objects
  */
-export const getAllReviewRounds = async (req, res) => {
-  const { page = 1, limit = 10, submissionId, status } = req.query
-  const options = { page, limit }
-
+export const getReviewRounds = async (req, res) => {
   try {
-    const query = [
-      { $sort: { submissionId: 1, roundNumber: 1 } },
-      {
-        $lookup: {
-          from: "submissions",
-          localField: "submissionId",
-          foreignField: "_id",
-          as: "submission",
-        },
-      },
-      { $unwind: "$submission" },
-      { $project: { __v: 0, "submission.__v": 0 } },
-    ]
+    const { submissionId } = req.query
 
-    if (submissionId) {
-      query.push({
-        $match: { submissionId: { $eq: submissionId } },
-      })
+    if (!submissionId) {
+      return res.status(400).json({ success: false, message: "Submission ID is required" })
     }
 
-    if (status) {
-      query.push({
-        $match: { status: { $eq: status } },
-      })
-    }
+    const reviewRounds = await ReviewRound.find({ submissionId }).sort({ roundNumber: 1 })
 
-    const aggregate = ReviewRound.aggregate(query)
-    const reviewRounds = await ReviewRound.aggregatePaginate(aggregate, options)
-
-    if (!reviewRounds.totalDocs) {
-      return res.status(404).json({ success: false, message: "No records found!" })
-    }
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Review rounds fetched successfully.",
       data: reviewRounds,
     })
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    res.status(400).json({ success: false, message: error.message })
   }
 }
 
 /**
  * @route   GET /api/review-rounds/:id
- * @desc    Get review round by ID
- * @params  { id }
+ * @desc    Get a specific review round by ID
+ * @params  id - ReviewRound ID
  * @returns ReviewRound object
  */
 export const getReviewRoundById = async (req, res) => {
-  const { id } = req.params
-
   try {
-    const reviewRound = await ReviewRound.findById(id).populate("submissionId")
+    const { id } = req.params
+
+    const reviewRound = await ReviewRound.findById(id)
 
     if (!reviewRound) {
-      return res.status(404).json({ success: false, message: "Review round not found." })
+      return res.status(404).json({ success: false, message: "Review round not found" })
     }
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Review round fetched successfully.",
       data: reviewRound,
     })
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
-  }
-}
-
-/**
- * @route   GET /api/review-rounds/:id/reviews
- * @desc    Get all reviews for a review round
- * @params  { id }
- * @returns Array of Review objects
- */
-export const getReviewRoundReviews = async (req, res) => {
-  const { id } = req.params
-  const { page = 1, limit = 10 } = req.query
-  const options = { page, limit }
-
-  try {
-    const reviewRound = await ReviewRound.findById(id)
-    if (!reviewRound) {
-      return res.status(404).json({ success: false, message: "Review round not found." })
-    }
-
-    const query = [
-      { $match: { reviewRoundId: { $eq: id } } },
-      { $sort: { createdAt: -1 } },
-      {
-        $lookup: {
-          from: "users",
-          localField: "reviewerId",
-          foreignField: "_id",
-          as: "reviewer",
-        },
-      },
-      { $unwind: "$reviewer" },
-      { $project: { __v: 0, "reviewer.__v": 0, "reviewer.password": 0 } },
-    ]
-
-    const aggregate = Review.aggregate(query)
-    const reviews = await Review.aggregatePaginate(aggregate, options)
-
-    return res.status(200).json({
-      success: true,
-      message: "Review round reviews fetched successfully.",
-      data: reviews,
-    })
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    res.status(400).json({ success: false, message: error.message })
   }
 }
 
 /**
  * @route   PUT /api/review-rounds/:id
- * @desc    Update review round by ID
- * @params  { id }
- * @body    { editorNotes, status, endDate }
- * @returns Success message
+ * @desc    Update a review round
+ * @params  id - ReviewRound ID
+ * @body    { status, endDate, editorNotes }
+ * @returns Updated ReviewRound object
  */
 export const updateReviewRound = async (req, res) => {
-  const { id } = req.params
-  const { editorNotes, status, endDate } = req.body
-
   try {
+    const { id } = req.params
+    const { status, endDate, editorNotes } = req.body
+
     const reviewRound = await ReviewRound.findById(id)
+
     if (!reviewRound) {
-      return res.status(404).json({ success: false, message: "Review round not found." })
+      return res.status(404).json({ success: false, message: "Review round not found" })
     }
 
-    const updateFields = {}
-    if (editorNotes !== undefined) updateFields.editorNotes = editorNotes
-    if (status) updateFields.status = status
-    if (endDate) updateFields.endDate = endDate
+    // Update fields if provided
+    if (status) reviewRound.status = status
+    if (endDate) reviewRound.endDate = endDate
+    if (editorNotes !== undefined) reviewRound.editorNotes = editorNotes
 
-    // If status is being updated to "completed", set endDate to now if not provided
-    if (status === "completed" && !endDate) {
-      updateFields.endDate = Date.now()
+    await reviewRound.save()
+
+    // If the review round is completed, update all pending reviews to overdue
+    if (status === "completed") {
+      await Review.updateMany(
+        { reviewRoundId: id, status: "pending" },
+        { status: "overdue" }
+      )
     }
 
-    await ReviewRound.findByIdAndUpdate(id, updateFields, { new: true })
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Review round updated successfully.",
+      message: "Review round updated successfully",
+      data: reviewRound,
     })
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    res.status(400).json({ success: false, message: error.message })
   }
 }
 
 /**
  * @route   DELETE /api/review-rounds/:id
- * @desc    Delete review round by ID
- * @params  { id }
+ * @desc    Delete a review round
+ * @params  id - ReviewRound ID
  * @returns Success message
  */
 export const deleteReviewRound = async (req, res) => {
-  const { id } = req.params
-
   try {
+    const { id } = req.params
+
     const reviewRound = await ReviewRound.findById(id)
+
     if (!reviewRound) {
-      return res.status(404).json({ success: false, message: "Review round not found." })
+      return res.status(404).json({ success: false, message: "Review round not found" })
     }
 
-    // Check if there are any reviews associated with this round
+    // Check if there are any reviews for this round
     const reviewsCount = await Review.countDocuments({ reviewRoundId: id })
     if (reviewsCount > 0) {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete review round with associated reviews. Remove reviews first.",
+        message: "Cannot delete review round with existing reviews",
       })
     }
 
-    await ReviewRound.findByIdAndDelete(id)
+    await reviewRound.remove()
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Review round deleted successfully.",
+      message: "Review round deleted successfully",
     })
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
-  }
-}
-
-/**
- * @route   PUT /api/review-rounds/:id/complete
- * @desc    Complete a review round
- * @params  { id }
- * @body    { editorNotes }
- * @returns Success message
- */
-export const completeReviewRound = async (req, res) => {
-  const { id } = req.params
-  const { editorNotes } = req.body
-
-  try {
-    const reviewRound = await ReviewRound.findById(id)
-    if (!reviewRound) {
-      return res.status(404).json({ success: false, message: "Review round not found." })
-    }
-
-    if (reviewRound.status === "completed") {
-      return res.status(400).json({ success: false, message: "Review round is already completed." })
-    }
-
-    const updateFields = {
-      status: "completed",
-      endDate: Date.now(),
-    }
-
-    if (editorNotes !== undefined) {
-      updateFields.editorNotes = editorNotes
-    }
-
-    await ReviewRound.findByIdAndUpdate(id, updateFields, { new: true })
-
-    return res.status(200).json({
-      success: true,
-      message: "Review round completed successfully.",
-    })
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    res.status(400).json({ success: false, message: error.message })
   }
 }

@@ -10,6 +10,8 @@ import article from './ArticleRoutes.js';
 import journal from './JournalRoutes.js';
 import issue from './IssueRoutes.js';
 import submission from './SubmissionRoutes.js';
+import reviewRound from './ReviewRoundRoutes.js';
+import review  from './ReviewRoutes.js';
 import changePassword from './ChangepasswordRoute.js'
 
 const router = rootRouter.Router({ mergeParams: true });
@@ -28,6 +30,8 @@ router.use('/issue', issue);
 router.use('/submission', submission);
 router.use('/role-d', roleRoutes);
 router.use('/role', roleRoutes);
+router.use('/review-rounds', reviewRound);
+router.use('/review', review);
 router.use('/change-pass', changePassword);
 
 export default router;

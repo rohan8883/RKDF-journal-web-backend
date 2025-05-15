@@ -1,7 +1,7 @@
 import Review from "../models/review.model.js"
-import ReviewRound from "../models/review-round.model.js"
+import ReviewRound from "../models/reviewRound.model.js"
 import Submission from "../models/submission.model.js"
-import User from "../models/user.model.js"
+// import User from "../models/user.model.js"
 
 /**
  * @route   POST /api/reviews
@@ -11,41 +11,31 @@ import User from "../models/user.model.js"
  */
 export const createReview = async (req, res) => {
   try {
-    const { reviewRoundId, reviewerId, submissionId, dueDate } = req.body
+    const { reviewRoundId, submissionId, recommendation, comments, confidentialComments, status } = req.body
+    const reviewerId = req.user._id // Assuming user is authenticated
 
-    if (!reviewRoundId || !reviewerId || !submissionId || !dueDate) {
+    if (!reviewRoundId || !submissionId) {
       return res.status(400).json({ success: false, message: "Missing required fields" })
     }
 
     // Verify review round exists
-    const reviewRoundExists = await ReviewRound.findById(reviewRoundId)
-    if (!reviewRoundExists) {
+    const reviewRound = await ReviewRound.findById(reviewRoundId)
+    if (!reviewRound) {
       return res.status(404).json({ success: false, message: "Review round not found" })
     }
 
-    // Verify reviewer exists
-    const reviewerExists = await User.findById(reviewerId)
-    if (!reviewerExists) {
-      return res.status(404).json({ success: false, message: "Reviewer not found" })
-    }
-
     // Verify submission exists
-    const submissionExists = await Submission.findById(submissionId)
-    if (!submissionExists) {
+    const submission = await Submission.findById(submissionId)
+    if (!submission) {
       return res.status(404).json({ success: false, message: "Submission not found" })
     }
 
-    // Check if this reviewer is already assigned to this submission in this round
-    const existingReview = await Review.findOne({
-      reviewRoundId,
-      reviewerId,
-      submissionId,
-    })
-
+    // Check if reviewer already has a review for this round
+    const existingReview = await Review.findOne({ reviewRoundId, reviewerId, submissionId })
     if (existingReview) {
       return res.status(400).json({
         success: false,
-        message: "This reviewer is already assigned to this submission in this review round",
+        message: "You have already submitted a review for this round",
       })
     }
 
@@ -53,13 +43,18 @@ export const createReview = async (req, res) => {
       reviewRoundId,
       reviewerId,
       submissionId,
-      dueDate,
+      recommendation,
+      comments,
+      confidentialComments,
+      submissionDate: status === "completed" ? new Date() : undefined,
+      status: status || "pending",
     })
 
     await review.save()
+
     res.status(201).json({
       success: true,
-      message: "Review assignment created successfully",
+      message: "Review created successfully",
       data: review,
     })
   } catch (error) {
@@ -73,84 +68,105 @@ export const createReview = async (req, res) => {
  * @query   { page, limit, reviewRoundId, reviewerId, submissionId, status }
  * @returns Paginated reviews
  */
+// export const getAllReviews = async (req, res) => {
+//   const { page = 1, limit = 10, reviewRoundId, reviewerId, submissionId, status } = req.query
+//   const options = { page, limit }
+
+//   try {
+//     const query = [
+//       { $sort: { createdAt: -1 } },
+//       {
+//         $lookup: {
+//           from: "review_rounds",
+//           localField: "reviewRoundId",
+//           foreignField: "_id",
+//           as: "reviewRound",
+//         },
+//       },
+//       { $unwind: "$reviewRound" },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "reviewerId",
+//           foreignField: "_id",
+//           as: "reviewer",
+//         },
+//       },
+//       { $unwind: "$reviewer" },
+//       {
+//         $lookup: {
+//           from: "submissions",
+//           localField: "submissionId",
+//           foreignField: "_id",
+//           as: "submission",
+//         },
+//       },
+//       { $unwind: "$submission" },
+//       { $project: { __v: 0, "reviewRound.__v": 0, "reviewer.__v": 0, "reviewer.password": 0, "submission.__v": 0 } },
+//     ]
+
+//     if (reviewRoundId) {
+//       query.push({
+//         $match: { reviewRoundId: { $eq: reviewRoundId } },
+//       })
+//     }
+
+//     if (reviewerId) {
+//       query.push({
+//         $match: { reviewerId: { $eq: reviewerId } },
+//       })
+//     }
+
+//     if (submissionId) {
+//       query.push({
+//         $match: { submissionId: { $eq: submissionId } },
+//       })
+//     }
+
+//     if (status) {
+//       query.push({
+//         $match: { status: { $eq: status } },
+//       })
+//     }
+
+//     const aggregate = Review.aggregate(query)
+//     const reviews = await Review.aggregatePaginate(aggregate, options)
+
+//     if (!reviews.totalDocs) {
+//       return res.status(404).json({ success: false, message: "No records found!" })
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Reviews fetched successfully.",
+//       data: reviews,
+//     })
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message })
+//   }
+// }
 export const getAllReviews = async (req, res) => {
-  const { page = 1, limit = 10, reviewRoundId, reviewerId, submissionId, status } = req.query
-  const options = { page, limit }
-
   try {
-    const query = [
-      { $sort: { createdAt: -1 } },
-      {
-        $lookup: {
-          from: "review_rounds",
-          localField: "reviewRoundId",
-          foreignField: "_id",
-          as: "reviewRound",
-        },
-      },
-      { $unwind: "$reviewRound" },
-      {
-        $lookup: {
-          from: "users",
-          localField: "reviewerId",
-          foreignField: "_id",
-          as: "reviewer",
-        },
-      },
-      { $unwind: "$reviewer" },
-      {
-        $lookup: {
-          from: "submissions",
-          localField: "submissionId",
-          foreignField: "_id",
-          as: "submission",
-        },
-      },
-      { $unwind: "$submission" },
-      { $project: { __v: 0, "reviewRound.__v": 0, "reviewer.__v": 0, "reviewer.password": 0, "submission.__v": 0 } },
-    ]
+    const { reviewRoundId } = req.query
 
-    if (reviewRoundId) {
-      query.push({
-        $match: { reviewRoundId: { $eq: reviewRoundId } },
-      })
+    if (!reviewRoundId) {
+      return res.status(400).json({ success: false, message: "Review round ID is required" })
     }
 
-    if (reviewerId) {
-      query.push({
-        $match: { reviewerId: { $eq: reviewerId } },
-      })
-    }
+    const reviews = await Review.find({ reviewRoundId })
+      .populate('reviewerId', 'fullName email')
+      .sort({ createdAt: 1 })
 
-    if (submissionId) {
-      query.push({
-        $match: { submissionId: { $eq: submissionId } },
-      })
-    }
-
-    if (status) {
-      query.push({
-        $match: { status: { $eq: status } },
-      })
-    }
-
-    const aggregate = Review.aggregate(query)
-    const reviews = await Review.aggregatePaginate(aggregate, options)
-
-    if (!reviews.totalDocs) {
-      return res.status(404).json({ success: false, message: "No records found!" })
-    }
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Reviews fetched successfully.",
       data: reviews,
     })
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    res.status(400).json({ success: false, message: error.message })
   }
 }
 
+ 
 /**
  * @route   GET /api/reviews/:id
  * @desc    Get review by ID
@@ -179,50 +195,51 @@ export const getReviewById = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message })
   }
 }
-
 /**
  * @route   PUT /api/reviews/:id
- * @desc    Update review by ID
- * @params  { id }
- * @body    { recommendation, comments, confidentialComments, attachments, submissionDate, dueDate, status }
- * @returns Success message
+ * @desc    Update a review
+ * @params  id - Review ID
+ * @body    { recommendation, comments, confidentialComments, status }
+ * @returns Updated Review object
  */
 export const updateReview = async (req, res) => {
-  const { id } = req.params
-  const updateFields = req.body
-
   try {
+    const { id } = req.params
+    const { recommendation, comments, confidentialComments, status } = req.body
+    const userId = req.user._id // Assuming user is authenticated
+
     const review = await Review.findById(id)
+
     if (!review) {
-      return res.status(404).json({ success: false, message: "Review not found." })
+      return res.status(404).json({ success: false, message: "Review not found" })
     }
 
-    // If status is being updated to "completed", ensure recommendation is provided
-    if (updateFields.status === "completed" && !updateFields.recommendation && !review.recommendation) {
-      return res.status(400).json({
-        success: false,
-        message: "Recommendation is required when completing a review",
-      })
+    // Only allow the reviewer or admin to update the review
+    // if (!req.user.isAdmin && review.reviewerId.toString() !== userId.toString()) {
+    //   return res.status(403).json({ success: false, message: "Not authorized to update this review" })
+    // }
+
+    // Update fields if provided
+    if (recommendation) review.recommendation = recommendation
+    if (comments !== undefined) review.comments = comments
+    if (confidentialComments !== undefined) review.confidentialComments = confidentialComments
+    
+    // If status is changing to completed, set submission date
+    if (status && status !== review.status && status === "completed") {
+      review.submissionDate = new Date()
     }
+    
+    if (status) review.status = status
 
-    // If recommendation is provided, set submissionDate to now if not already set
-    if (updateFields.recommendation && !review.submissionDate) {
-      updateFields.submissionDate = Date.now()
-    }
+    await review.save()
 
-    // If status is being updated to "completed", set submissionDate to now if not already set
-    if (updateFields.status === "completed" && !review.submissionDate) {
-      updateFields.submissionDate = Date.now()
-    }
-
-    await Review.findByIdAndUpdate(id, updateFields, { new: true })
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Review updated successfully.",
+      message: "Review updated successfully",
+      data: review,
     })
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    res.status(400).json({ success: false, message: error.message })
   }
 }
 
