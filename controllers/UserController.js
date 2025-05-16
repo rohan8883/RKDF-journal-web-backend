@@ -315,6 +315,143 @@ export async function GetAllReviewer(req, res) {
     });
   }
 }
+export async function GetAllAuthor(req, res) {
+  const { page = 1, limit = 10, q } = req.query;
+  try {
+    const options = { page, limit };
+
+    let query = [
+      {
+        $sort: {
+          createdAt: -1
+        }
+      },
+      {
+        $project: {
+          __v: 0,
+          password: 0
+        }
+      }
+    ];
+
+    if (q) {
+      query.push({
+        $match: {
+          $or: [
+            { email: { $regex: new RegExp(q, 'i') } },
+            { fullName: { $regex: new RegExp(q, 'i') } },
+            { 'role.roleName': { $regex: new RegExp(q, 'i') } },
+            { 'ulb.ulbName': { $regex: new RegExp(q, 'i') } }
+          ]
+        }
+      });
+    }
+
+    const aggregate = Users.aggregate([
+      {
+        $lookup: {
+          from: 'tbl_ulbs_mstrs',
+          localField: 'ulbId',
+          foreignField: '_id',
+          as: 'ulb'
+        }
+      },
+      {
+        $unwind: {
+          path: '$ulb',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_roles_mstrs',
+          localField: 'roleId',
+          foreignField: '_id',
+          as: 'role'
+        }
+      },
+      {
+        $unwind: {
+          path: '$role',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Add filter for Author role
+      {
+        $match: {
+          'role.roleName': 'Author'
+        }
+      },
+      ...query,
+      {
+        $project: {
+          _id: 1,
+          fullName: 1,
+          email: 1,
+          mobile: 1,
+          address: 1,
+          zipCode: 1,
+          country: 1,
+          states: 1,
+          city: 1,
+          imageUrl: 1,
+          fullImgUrl: 1,
+          status: 1,
+          roleId: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          role: '$role.roleName',
+          ulb: '$ulb.ulbName'
+        }
+      },
+      {
+        $lookup: {
+          from: 'tbl_permissions',
+          localField: 'roleId',
+          foreignField: 'roleId',
+          as: 'permission'
+        }
+      },
+      {
+        $project: {
+          'permission._id': 0,
+          'permission.roleId': 0,
+          'permission.createdAt': 0,
+          'permission.updatedAt': 0,
+          'permission.status': 0,
+          'permission.__v': 0
+        }
+      }
+    ]);
+
+    const getAllUsers = await Users.aggregatePaginate(aggregate, options);
+
+    if (!getAllUsers || getAllUsers.docs.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No reviewer users found!',
+        data: {
+          docs: [],
+          totalDocs: 0,
+          limit: parseInt(limit),
+          page: parseInt(page),
+          totalPages: 0
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Reviewer users fetched successfully.',
+      data: getAllUsers
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+}
 // ════════════════════════════║  API TO Get User By Id ║═════════════════════════════════//
 
 export async function GetUserWithId(req, res) {
@@ -619,7 +756,6 @@ export async function UpdatePermission(req, res) {
 export async function CreateUser(req, res) {
   const {
     fullName,
-    familyName,
     email,
     userName,
     mobile,
@@ -648,7 +784,6 @@ export async function CreateUser(req, res) {
     const hashPassword = await hash(String(password));
     const createUser = await Users.create({
       fullName,
-      familyName,
       userName,
       affiliation,
       email,

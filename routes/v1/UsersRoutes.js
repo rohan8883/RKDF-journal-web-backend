@@ -3,6 +3,7 @@ import {
   GetUser,
   CreateUser,
   GetAllReviewer,
+  GetAllAuthor,
   UpdatePermission,
   GetUserWithId,
   GetAllUsers,
@@ -17,6 +18,7 @@ const router = useRouter.Router();
 router.get('/get-user', GetUser); // endpoint: /user/get-user
 router.get('/get-all-user', GetAllUsers);  
 router.get('/get-all-reviewer', GetAllReviewer);  
+router.get('/get-all-author', GetAllAuthor);  
 router.put('/upload-image-url', UploadProfileImage); // endpoint: /user/upload-image-url {imageUrl}
 router.put('/update-profile', UpdateUser);  
 router.put('/update-user-role/:id', UpdateUserRole);

@@ -53,7 +53,7 @@ import { uploadFile } from '../middleware/_multer.js';
 export async function CreateSubmission(req, res) {
   const upload = await uploadFile('./uploads/manuscripts');
   try {
-    await upload.single('manuscriptFile')(req, res, async (err) => { 
+    await upload.single('manuscriptFile')(req, res, async (err) => {
 
       if (err) {
         return res.status(400).json({ success: false, message: err.message });
@@ -61,7 +61,7 @@ export async function CreateSubmission(req, res) {
 
 
       const { title, abstract, keywords, journalId } = req.body;
-      const submittedBy = req.user._id; // Assuming user is authenticated and added to req.user
+      const submittedBy = req.body.submittedBy || req.user._id;
 
       // Validate required fields
       if (!title || !abstract || !journalId || !req.file) {
@@ -104,7 +104,7 @@ export async function CreateSubmission(req, res) {
     return res.status(500).json({ success: false, message: error.message });
   }
 }
- 
+
 export const AssignReviewer = async (req, res) => {
   const { submissionId, reviewerId } = req.body;
 
@@ -160,7 +160,105 @@ export const AssignReviewer = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+export const UpdateReviewerAssignment = async (req, res) => {
+  const { submissionId, reviewerId, comment } = req.body;
 
+  if (!submissionId || !reviewerId || !comment) {
+    return res.status(400).json({
+      success: false,
+      message: "submissionId, reviewerId, and comment are required",
+    });
+  }
+
+  try {
+    const submission = await Submission.findById(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: "Submission not found.",
+      });
+    }
+
+    // Find the reviewer assignment
+    const assignment = submission.reviewerAssignments.find(
+      (assignment) => assignment.reviewer.toString() === reviewerId
+    );
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: "Reviewer assignment not found.",
+      });
+    }
+
+    // Update the assignment
+    assignment.comment = comment;
+    assignment.commentedAt = new Date();
+
+    await submission.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Reviewer assignment updated successfully.",
+      data: submission,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const DeleteReviewerAssignment = async (req, res) => {
+  const { submissionId, reviewerId } = req.body;
+
+  if (!submissionId || !reviewerId) {
+    return res.status(400).json({
+      success: false,
+      message: "submissionId and reviewerId are required",
+    });
+  }
+
+  try {
+    const submission = await Submission.findById(submissionId);
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: "Submission not found.",
+      });
+    }
+
+    // Find the index of the reviewer assignment
+    const assignmentIndex = submission.reviewerAssignments.findIndex(
+      (assignment) => assignment.reviewer.toString() === reviewerId
+    );
+
+    if (assignmentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Reviewer assignment not found.",
+      });
+    }
+
+    // Remove the assignment
+    submission.reviewerAssignments.splice(assignmentIndex, 1);
+
+    // If no reviewers left, change status back to submitted
+    if (submission.reviewerAssignments.length === 0 && submission.status === "under_review") {
+      submission.status = "submitted";
+    }
+
+    await submission.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Reviewer assignment deleted successfully.",
+      data: submission,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 /**
  * @route   GET /api/submissions
  * @desc    Get all submissions with pagination and search
@@ -243,7 +341,7 @@ export const AssignReviewer = async (req, res) => {
 //     return res.status(500).json({ success: false, message: error.message })
 //   }
 // }
- 
+
 // export const GetAllSubmissions = async (req, res) => {
 //   const { page = 1, limit = 10, q, journalId, submittedBy, status } = req.query;
 //   const options = { page, limit };
@@ -318,7 +416,7 @@ export const AssignReviewer = async (req, res) => {
 //     return res.status(500).json({ success: false, message: error.message });
 //   }
 // };
- 
+
 // export const GetAllSubmissions = async (req, res) => {
 //   const { page = 1, limit = 10, q, journalId, status } = req.query;
 //   const options = { page, limit };
@@ -397,7 +495,7 @@ export const AssignReviewer = async (req, res) => {
 //     return res.status(500).json({ success: false, message: error.message });
 //   }
 // };
- 
+
 
 export const GetAllSubmissions = async (req, res) => {
   const { page = 1, limit = 10, q, journalId, status } = req.query;
@@ -539,34 +637,34 @@ export const GetSubmissionById = async (req, res) => {
  * @body    { title, abstract, keywords, status, manuscriptFile, coverLetter }
  * @returns Success message
  */
-  export const UpdateSubmission = async (req, res) => {
-    const { id } = req.params
-    const updateFields = req.body
+export const UpdateSubmission = async (req, res) => {
+  const { id } = req.params
+  const updateFields = req.body
 
-    try {
-      const submission = await Submission.findById(id)
-      if (!submission) {
-        return res.status(404).json({ success: false, message: "Submission not found." })
-      }
-
-      // Don't allow changing submittedBy or journalId after creation
-      if (updateFields.submittedBy || updateFields.journalId) {
-        return res.status(400).json({
-          success: false,
-          message: "Cannot change submitter or journal after submission is created",
-        })
-      }
-
-      await Submission.findByIdAndUpdate(id, updateFields, { new: true })
-
-      return res.status(200).json({
-        success: true,
-        message: "Submission updated successfully.",
-      })
-    } catch (error) {
-      return res.status(500).json({ success: false, message: error.message })
+  try {
+    const submission = await Submission.findById(id)
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission not found." })
     }
+
+    // Don't allow changing submittedBy or journalId after creation
+    if (updateFields.submittedBy || updateFields.journalId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot change submitter or journal after submission is created",
+      })
+    }
+
+    await Submission.findByIdAndUpdate(id, updateFields, { new: true })
+
+    return res.status(200).json({
+      success: true,
+      message: "Submission updated successfully.",
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message })
   }
+}
 
 /**
  * @route   PATCH /api/submissions/:id/status
