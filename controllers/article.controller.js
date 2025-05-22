@@ -10,9 +10,9 @@ import Submission from "../models/submission.model.js"
  */
 export async function CreateArticle(req, res) {
   try {
-    const { title, abstract, keywords, issueId, submissionId, doi, pages, publicationDate, fullText } = req.body
+    const { title, abstract, keywords, issueId, submissionId, doi, pages, publicationDate, manuscriptFile } = req.body
 
-    if (!title || !abstract || !issueId || !fullText) {
+    if (!title || !abstract || !issueId || !manuscriptFile) {
       return res.status(400).json({ success: false, message: "Missing required fields" })
     }
 
@@ -39,7 +39,7 @@ export async function CreateArticle(req, res) {
       doi,
       pages,
       publicationDate,
-      fullText,
+      manuscriptFile,
     })
 
     await article.save()

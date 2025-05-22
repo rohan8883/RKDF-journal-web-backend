@@ -10,7 +10,7 @@ const articleSchema = new Schema({
   doi: { type: String },
   pages: { type: String },
   publicationDate: { type: Date },
-  fullText: { type: String, required: true },
+  manuscriptFile: { type: String, required: true },
   status: { type: Number, default: 1 },
   createdAt: { type: Date, default: Date.now },
 })
