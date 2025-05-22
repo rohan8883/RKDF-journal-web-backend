@@ -60,7 +60,7 @@ export async function CreateSubmission(req, res) {
       }
 
 
-      const { title, abstract, keywords, journalId } = req.body;
+      const { title, abstract, keywords, journalId, references } = req.body;
       const submittedBy = req.body.submittedBy || req.user._id;
 
       // Validate required fields
@@ -84,6 +84,7 @@ export async function CreateSubmission(req, res) {
       const submission = new Submission({
         title,
         abstract,
+        references,
         keywords,
         submittedBy,
         journalId,

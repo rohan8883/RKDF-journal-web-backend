@@ -38,6 +38,7 @@ import aggregatePaginate from "mongoose-aggregate-paginate-v2"
 const submissionSchema = new Schema({
   title: String,
   abstract: String,
+  references: String,
   keywords: [String],
   submittedBy: { type: Schema.Types.ObjectId, ref: "users", required: true },
   journalId: { type: Schema.Types.ObjectId, ref: "Journal", required: true },
