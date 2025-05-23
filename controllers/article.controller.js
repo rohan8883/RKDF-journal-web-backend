@@ -130,8 +130,34 @@ export const GetAllArticles = async (req, res) => {
  * @params  { id }
  * @returns Article object
  */
+// export const GetArticleById = async (req, res) => {
+//   const { id } = req.params
+
+//   try {
+//     const article = await Article.findById(id)
+//       .populate({
+//         path: "issueId",
+//         populate: {
+//           path: "journalId",
+//         },
+//       })
+//       .populate("submissionId")
+
+//     if (!article) {
+//       return res.status(404).json({ success: false, message: "Article not found." })
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Article fetched successfully.",
+//       data: article,
+//     })
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message })
+//   }
+// }
 export const GetArticleById = async (req, res) => {
-  const { id } = req.params
+  const { id } = req.params;
 
   try {
     const article = await Article.findById(id)
@@ -141,21 +167,26 @@ export const GetArticleById = async (req, res) => {
           path: "journalId",
         },
       })
-      .populate("submissionId")
+      .populate({
+        path: "submissionId",
+        populate: {
+          path: "submittedBy", // This assumes 'submittedBy' is a reference to a user or author
+        },
+      });
 
     if (!article) {
-      return res.status(404).json({ success: false, message: "Article not found." })
+      return res.status(404).json({ success: false, message: "Article not found." });
     }
 
     return res.status(200).json({
       success: true,
       message: "Article fetched successfully.",
       data: article,
-    })
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message })
+    return res.status(500).json({ success: false, message: error.message });
   }
-}
+};
 
 /**
  * @route   PUT /api/articles/:id
