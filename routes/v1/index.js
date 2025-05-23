@@ -19,7 +19,8 @@ const router = rootRouter.Router({ mergeParams: true });
 router.use('/auth', authRoutes);
 router.use('/otp', otp);
 router.use('/user-d', usersRoutes);
-
+router.use('/guest-issue', issue);
+router.use('/guest-article', article);
 // ════════════════════════════║  middleware to protect all routes   ║═════════════════════════════════
 router.use(authMiddleWare); // protect all routes
 // router.use(authCookieMiddleware); // protect all routes
