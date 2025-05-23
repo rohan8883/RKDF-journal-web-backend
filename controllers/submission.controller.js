@@ -9,59 +9,84 @@ import { uploadFile } from '../middleware/_multer.js';
  * @body    { title, abstract, keywords, submittedBy, journalId, manuscriptFile, coverLetter }
  * @returns Submission object
  */
+ 
 // export async function CreateSubmission(req, res) {
+//   const upload = await uploadFile('./uploads/manuscripts');
 //   try {
-//     const { title, abstract, keywords, journalId, manuscriptFile, coverLetter } = req.body
-//     const submittedBy = req.user._id // 🟢 Get user ID from token
+//     await upload.single('manuscriptFile')(req, res, async (err) => {
 
-//     if (!title || !abstract || !journalId || !manuscriptFile) {
-//       return res.status(400).json({ success: false, message: "Missing required fields" })
-//     }
+//       if (err) {
+//         return res.status(400).json({ success: false, message: err.message });
+//       }
 
-//     // Verify person exists (optional if user is already authenticated)
-//     const personExists = await Person.findById(submittedBy)
-//     if (!personExists) {
-//       return res.status(404).json({ success: false, message: "Person not found" })
-//     }
 
-//     // Verify journal exists
-//     const journalExists = await Journal.findById(journalId)
-//     if (!journalExists) {
-//       return res.status(404).json({ success: false, message: "Journal not found" })
-//     }
+//       const { title, abstract, keywords, journalId, references } = req.body;
+//       const submittedBy = req.body.submittedBy || req.user._id;
 
-//     const submission = new Submission({
-//       title,
-//       abstract,
-//       keywords,
-//       submittedBy,
-//       journalId,
-//       manuscriptFile,
-//       coverLetter,
-//     })
+//       // Validate required fields
+//       if (!title || !abstract || !journalId || !req.file) {
+//         return res.status(400).json({ success: false, message: "Missing required fields" });
+//       }
 
-//     await submission.save()
-//     res.status(201).json({
-//       success: true,
-//       message: "Submission created successfully",
-//       data: submission,
-//     })
+//       // Check if person exists
+//       const personExists = await Person.findById(submittedBy);
+//       if (!personExists) {
+//         return res.status(404).json({ success: false, message: "Person not found" });
+//       }
+
+//       // Check if journal exists
+//       const journalExists = await Journal.findById(journalId);
+//       if (!journalExists) {
+//         return res.status(404).json({ success: false, message: "Journal not found" });
+//       }
+
+//       // Create submission
+//       const submission = new Submission({
+//         title,
+//         abstract,
+//         references,
+//         keywords,
+//         submittedBy,
+//         journalId,
+//         manuscriptFile: req.file.filename,
+//         fullManuscriptUrl: `${process.env.BACKEND_URL}/${req.file.filename}`
+//       });
+
+//       await submission.save();
+
+//       return res.status(201).json({
+//         success: true,
+//         message: "Submission created successfully",
+//         data: submission
+//       });
+
+//     });
 //   } catch (error) {
-//     res.status(400).json({ success: false, message: error.message })
+//     return res.status(500).json({ success: false, message: error.message });
 //   }
 // }
+
+
 export async function CreateSubmission(req, res) {
   const upload = await uploadFile('./uploads/manuscripts');
   try {
     await upload.single('manuscriptFile')(req, res, async (err) => {
-
       if (err) {
         return res.status(400).json({ success: false, message: err.message });
       }
 
-
-      const { title, abstract, keywords, journalId, references } = req.body;
+      const { 
+        title, 
+        abstract, 
+        keywords, 
+        journalId, 
+        references, 
+        hasContributors,
+        contributors 
+      } = req.body;
+      
       const submittedBy = req.body.submittedBy || req.user._id;
+      const hasContributorsBool = hasContributors === 'true' || hasContributors === true;
 
       // Validate required fields
       if (!title || !abstract || !journalId || !req.file) {
@@ -80,16 +105,58 @@ export async function CreateSubmission(req, res) {
         return res.status(404).json({ success: false, message: "Journal not found" });
       }
 
+      // Parse contributors if they exist
+      let parsedContributors = [];
+      if (hasContributorsBool && contributors) {
+        try {
+          parsedContributors = typeof contributors === 'string' 
+            ? JSON.parse(contributors) 
+            : contributors;
+          
+          // Validate each contributor has required fields
+          if (Array.isArray(parsedContributors)) {
+            for (const contributor of parsedContributors) {
+              if (!contributor.fullName || !contributor.email || !contributor.affiliation || !contributor.bioStatement) {
+                return res.status(400).json({ 
+                  success: false, 
+                  message: "All contributor fields (fullName, email, affiliation, bioStatement) are required" 
+                });
+              }
+            }
+          }
+        } catch (parseError) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Invalid contributors format" 
+          });
+        }
+      }
+
+      // Parse keywords if they exist
+      let parsedKeywords = [];
+      if (keywords) {
+        try {
+          parsedKeywords = typeof keywords === 'string' 
+            ? JSON.parse(keywords) 
+            : keywords;
+        } catch (parseError) {
+          // If JSON parse fails, assume it's a comma-separated string
+          parsedKeywords = keywords.split(',').map(k => k.trim()).filter(k => k);
+        }
+      }
+
       // Create submission
       const submission = new Submission({
         title,
         abstract,
         references,
-        keywords,
+        keywords: parsedKeywords,
         submittedBy,
         journalId,
         manuscriptFile: req.file.filename,
-        fullManuscriptUrl: `${process.env.BACKEND_URL}/${req.file.filename}`
+        fullManuscriptUrl: `${process.env.BACKEND_URL}/${req.file.filename}`,
+        hasContributors: hasContributorsBool,
+        contributors: hasContributorsBool ? parsedContributors : []
       });
 
       await submission.save();
@@ -99,7 +166,6 @@ export async function CreateSubmission(req, res) {
         message: "Submission created successfully",
         data: submission
       });
-
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

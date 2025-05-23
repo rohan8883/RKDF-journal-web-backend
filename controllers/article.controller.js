@@ -1,7 +1,7 @@
 import Article from "../models/article.model.js"
 import Issue from "../models/issue.model.js"
 import Submission from "../models/submission.model.js"
-
+import mongoose from 'mongoose';
 /**
  * @route   POST /api/articles
  * @desc    Create a new article
@@ -122,7 +122,79 @@ export const GetAllArticles = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message })
   }
-}
+} 
+
+ 
+
+export const AuthorAllArticles = async (req, res) => {
+  const { page = 1, limit = 10, q, issueId } = req.query;
+  const options = { page: parseInt(page), limit: parseInt(limit) };
+
+  try {
+    const query = [
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "issues",
+          localField: "issueId",
+          foreignField: "_id",
+          as: "issue",
+        },
+      },
+      { $unwind: "$issue" },
+      {
+        $lookup: {
+          from: "journals",
+          localField: "issue.journalId",
+          foreignField: "_id",
+          as: "journal",
+        },
+      },
+      { $unwind: "$journal" },
+      { $project: { __v: 0, "issue.__v": 0, "journal.__v": 0 } },
+    ];
+
+    if (issueId && mongoose.Types.ObjectId.isValid(issueId)) {
+      query.push({
+        $match: { issueId: new mongoose.Types.ObjectId(issueId) },
+      });
+    }
+
+    if (q) {
+      const regex = new RegExp(q, "i");
+      query.push({
+        $match: {
+          $or: [
+            { title: { $regex: regex } },
+            { abstract: { $regex: regex } },
+            { keywords: { $regex: regex } },
+            { "issue.title": { $regex: regex } },
+            { "journal.title": { $regex: regex } },
+          ],
+        },
+      });
+    }
+
+    const aggregate = Article.aggregate(query);
+    const articles = await Article.aggregatePaginate(aggregate, options);
+
+    if (!articles.totalDocs) {
+      return res.status(404).json({ success: false, message: "No records found!" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Articles fetched successfully.",
+      data: articles,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+ 
+ 
 
 /**
  * @route   GET /api/articles/:id
