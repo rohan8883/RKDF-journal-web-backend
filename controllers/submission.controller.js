@@ -9,7 +9,7 @@ import { uploadFile } from '../middleware/_multer.js';
  * @body    { title, abstract, keywords, submittedBy, journalId, manuscriptFile, coverLetter }
  * @returns Submission object
  */
- 
+
 // export async function CreateSubmission(req, res) {
 //   const upload = await uploadFile('./uploads/manuscripts');
 //   try {
@@ -75,22 +75,26 @@ export async function CreateSubmission(req, res) {
         return res.status(400).json({ success: false, message: err.message });
       }
 
-      const { 
-        title, 
-        abstract, 
-        keywords, 
-        journalId, 
-        references, 
+      const {
+        authorName,
+        authorEmail,
+        authorAffiliation,
+        authorBioStatement,
+        title,
+        abstract,
+        keywords,
+        journalId,
+        references,
         hasContributors,
-        contributors 
+        contributors
       } = req.body;
-      
-      const submittedBy = req.body.submittedBy || req.user._id;
+
+      const submittedBy = req.user._id;
       const hasContributorsBool = hasContributors === 'true' || hasContributors === true;
 
       // Validate required fields
-      if (!title || !abstract || !journalId || !req.file) {
-        return res.status(400).json({ success: false, message: "Missing required fields" });
+      if (!authorName || !authorEmail ||!authorAffiliation ||!authorBioStatement || !title || !abstract || !journalId || !req.file) {
+        return res.status(200).json({ success: false, message: "Missing required fields" });
       }
 
       // Check if person exists
@@ -109,25 +113,25 @@ export async function CreateSubmission(req, res) {
       let parsedContributors = [];
       if (hasContributorsBool && contributors) {
         try {
-          parsedContributors = typeof contributors === 'string' 
-            ? JSON.parse(contributors) 
+          parsedContributors = typeof contributors === 'string'
+            ? JSON.parse(contributors)
             : contributors;
-          
+
           // Validate each contributor has required fields
           if (Array.isArray(parsedContributors)) {
             for (const contributor of parsedContributors) {
               if (!contributor.fullName || !contributor.email || !contributor.affiliation || !contributor.bioStatement) {
-                return res.status(400).json({ 
-                  success: false, 
-                  message: "All contributor fields (fullName, email, affiliation, bioStatement) are required" 
+                return res.status(400).json({
+                  success: false,
+                  message: "All contributor fields (fullName, email, affiliation, bioStatement) are required"
                 });
               }
             }
           }
         } catch (parseError) {
-          return res.status(400).json({ 
-            success: false, 
-            message: "Invalid contributors format" 
+          return res.status(400).json({
+            success: false,
+            message: "Invalid contributors format"
           });
         }
       }
@@ -136,8 +140,8 @@ export async function CreateSubmission(req, res) {
       let parsedKeywords = [];
       if (keywords) {
         try {
-          parsedKeywords = typeof keywords === 'string' 
-            ? JSON.parse(keywords) 
+          parsedKeywords = typeof keywords === 'string'
+            ? JSON.parse(keywords)
             : keywords;
         } catch (parseError) {
           // If JSON parse fails, assume it's a comma-separated string
@@ -147,6 +151,10 @@ export async function CreateSubmission(req, res) {
 
       // Create submission
       const submission = new Submission({
+        authorName,
+        authorEmail,
+        authorAffiliation,
+        authorBioStatement,
         title,
         abstract,
         references,

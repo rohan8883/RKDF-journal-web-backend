@@ -96,6 +96,22 @@ import { model, Schema } from "mongoose";
 import aggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const submissionSchema = new Schema({
+  authorName: { 
+    type: String, 
+    required: true 
+  },
+  authorEmail: { 
+    type: String, 
+    required: true 
+  },
+  authorAffiliation: { 
+    type: String, 
+    required: true 
+  },
+  authorBioStatement: { 
+    type: String, 
+    required: true 
+  },
   title: { 
     type: String, 
     required: true 
